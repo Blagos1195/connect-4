@@ -2,6 +2,10 @@ name: Compare Connect Four Models
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/candidate-comparison.yml'
 
 permissions:
   actions: read
@@ -26,10 +30,10 @@ jobs:
       - name: Download the completed training candidate
         uses: actions/download-artifact@v4
         with:
-          name: connect-four-from-scratch
+          name: connect-four-dataset-trained
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          run-id: 42315318730
+          run-id: 42360303628
           path: artifacts
 
       - name: Compare candidate with published model
