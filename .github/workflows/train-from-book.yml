@@ -1,0 +1,76 @@
+name: Train From Connect Four Solved Opening Book
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/train-from-book.yml"
+      - "scripts/train_from_book.py"
+      - "requirements.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connect-four-book-training
+  cancel-in-progress: true
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Verify and load the exact 12-ply database
+        run: |
+          python - <<'PY'
+          import bitbully_databases as bbd
+
+          db = bbd.BitBullyDatabases("12-ply-dist")
+          expected = [
+              [0, 0, 0, 0, 0, 0, 0],
+              [0, 0, 0, 1, 0, 0, 0],
+              [0, 1, 0, 2, 0, 0, 0],
+              [0, 2, 0, 1, 0, 2, 0],
+              [0, 1, 0, 2, 0, 1, 0],
+              [0, 2, 0, 1, 0, 2, 0],
+          ]
+          assert db.get_book_size() == 4200899
+          assert db.has_win_distances()
+          assert db.get_book_value(expected) == 71
+          print(f"Verified {db.get_book_size():,} exact positions.")
+          PY
+
+      - name: Train value function from exact outcomes
+        run: |
+          python scripts/train_from_book.py --model models/connect4_ntuple.npz --output models/candidates/book-pretrained.npz --positions 300000 --max-attempts 3000000 --epochs 5 --learning-rate 0.0002 --seed "$GITHUB_RUN_NUMBER"
+
+      - name: Fine-tune through self-play and tactical opponents
+        run: |
+          python main.py --games 100000000 --time-limit-minutes 330 --search-depth 2 --alpha 0.02 --epsilon-start 0.25 --epsilon-end 0.02 --eval-every-minutes 30 --eval-games 100 --eval-seed 100000 --save-every-minutes 5 --seed "$GITHUB_RUN_NUMBER" --resume models/candidates/book-pretrained.npz --output models/candidates/latest.npz --best-output models/candidates/best.npz --log training_from_book.csv
+
+      - name: Save candidate and training history
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: connect-four-book-trained
+          path: |
+            models/candidates/book-pretrained.npz
+            models/candidates/latest.npz
+            models/candidates/best.npz
+            training_from_book.csv
+            book_training_report.json
+          if-no-files-found: warn
+          retention-days: 90
