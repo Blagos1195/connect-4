@@ -104,7 +104,7 @@ def main():
 
     started = time.perf_counter()
     positions = generate_positions(args.positions, args.seed)
-    payload = "".join(item[0] + "\\n" for item in positions)
+    payload = "".join(item[0] + "\n" for item in positions)
     result = subprocess.run(
         [args.solver, "-a", "-b", "/dev/null"],
         input=payload, text=True, capture_output=True, check=True,
