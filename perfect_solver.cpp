@@ -301,6 +301,7 @@ public:
     }
 
     int best_move(const Position& p) {
+        if (p.moves == 0) return 3;
         uint64_t legal = p.legal_moves();
         if (!legal) return -1;
 
