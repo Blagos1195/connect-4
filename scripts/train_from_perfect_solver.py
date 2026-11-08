@@ -64,6 +64,9 @@ def generate_positions(count, seed):
             sequence.append(str(col + 1))
             if won:
                 sequence.pop()
+                game = ConnectFour()
+                for move in sequence:
+                    game.play(int(move) - 1)
                 break
         if len(sequence) < 8 or game.moves >= ROWS * COLS:
             continue
