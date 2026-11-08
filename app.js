@@ -32,6 +32,8 @@ let perfectSolverReady = false;
 let bookInstalled = false;
 let bookUpdateAvailable = false;
 let perfectSolverLoading = null;
+let bookDownloadWorker = null;
+let bookDownloadPromise = null;
 let solverRequestId = 0;
 const pendingSolverRequests = new Map();
 let moveSequence = [];
@@ -70,7 +72,7 @@ function loadPerfectSolver() {
         resolve();
         return;
       }
-      if (data.type === "book-downloaded") {
+      if (data.type === "book-installed") {
         updateBookStatus(true, false);
         return;
       }
@@ -412,12 +414,37 @@ secretHintButton.addEventListener("click", () => {
   render();
 });
 
-bookButton.addEventListener("click", () => {
-  if (!engineReady || bookButton.disabled) return;
+bookButton.addEventListener("click", async () => {
+  if (!engineReady || bookButton.disabled || bookDownloadPromise) return;
   bookButton.disabled = true;
   bookButton.textContent = bookInstalled ? "Updating opening book..." : "Downloading opening book...";
-  bookStatus.textContent = "Downloading and saving this device's copy.";
-  perfectSolverWorker.postMessage({ type: "download-book" });
+  bookStatus.textContent = "Downloading the book before the next solver calculation.";
+  bookDownloadWorker = new Worker("book_download_worker.js?v=1");
+  bookDownloadPromise = new Promise((resolve, reject) => {
+    bookDownloadWorker.onmessage = async event => {
+      const data = event.data;
+      if (data.type === "downloaded") {
+        try {
+          await loadPerfectSolver();
+          perfectSolverWorker.postMessage({ type: "install-book", data: data.data, version: data.version }, [data.data]);
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      } else if (data.type === "error") {
+        reject(new Error(data.message));
+      }
+    };
+    bookDownloadWorker.onerror = event => reject(new Error(event.message || "The book download failed."));
+    bookDownloadWorker.postMessage({ type: "download" });
+  }).catch(error => {
+    bookStatus.textContent = error.message || String(error);
+    updateBookStatus(bookInstalled, bookUpdateAvailable);
+  }).finally(() => {
+    bookDownloadWorker?.terminate();
+    bookDownloadWorker = null;
+    bookDownloadPromise = null;
+  });
 });
 
 document.querySelector("#new-game").addEventListener("click", () => startGame());
