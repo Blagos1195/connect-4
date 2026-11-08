@@ -192,7 +192,7 @@ public:
         uint64_t mask = key_bytes == 8 ? UINT64_MAX : ((1ULL << (8 * key_bytes)) - 1);
         if ((key & mask) != stored) return -1000;
         uint8_t encoded = values[index];
-        return encoded ? static_cast<int>(encoded) - CELLS / 2 - 1 : -1000;
+        return encoded ? static_cast<int>(encoded) - (CELLS / 2 - 3) - 1 : -1000;
     }
 };
 
