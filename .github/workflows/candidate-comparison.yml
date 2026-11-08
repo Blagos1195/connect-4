@@ -1,4 +1,4 @@
-name: Compare Connect Four Models
+name: Compare Connect Four Book Models
 
 on:
   workflow_dispatch:
@@ -27,23 +27,29 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Download the completed training candidate
+      - name: Download the completed book-training artifact
         uses: actions/download-artifact@v4
         with:
-          name: connect-four-dataset-trained
+          name: connect-four-book-trained
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          run-id: 42360303628
+          run-id: 42416710461
           path: artifacts
 
-      - name: Compare candidate with published model
+      - name: Compare database-pretrained model with published model
         run: |
-          python scripts/compare_candidates.py --candidate artifacts/models/candidates/best.npz --champion models/connect4_ntuple.npz --games 1000 --depth 2 --seed 700000
+          python scripts/compare_candidates.py --candidate artifacts/models/candidates/book-pretrained.npz --champion models/connect4_ntuple.npz --games 500 --depth 2 --seed 810000 --output comparison-pretrained.json
 
-      - name: Save comparison report
+      - name: Compare self-play model with published model
+        run: |
+          python scripts/compare_candidates.py --candidate artifacts/models/candidates/latest.npz --champion models/connect4_ntuple.npz --games 500 --depth 2 --seed 910000 --output comparison-selfplay.json
+
+      - name: Save comparison reports
         uses: actions/upload-artifact@v4
         with:
-          name: connect-four-model-comparison
-          path: comparison.json
+          name: connect-four-book-model-comparison
+          path: |
+            comparison-pretrained.json
+            comparison-selfplay.json
           if-no-files-found: error
           retention-days: 90
