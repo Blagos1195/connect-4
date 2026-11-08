@@ -68,38 +68,25 @@ struct Position {
 
     uint64_t winning_moves(uint64_t stones) const {
         uint64_t result = 0;
-        uint64_t moves_mask = legal_moves();
-        while (moves_mask) {
-            uint64_t move = moves_mask & -moves_mask;
-            moves_mask ^= move;
-            if (won(stones | move)) result |= move;
+        for (int shift : SHIFTS) {
+            uint64_t three = stones & (stones >> shift) & (stones >> (2 * shift));
+            result |= three << (3 * shift);
+            result |= three;
+            three = stones & (stones >> (2 * shift)) & (stones >> (3 * shift));
+            result |= three << shift;
+            three = stones & (stones >> shift) & (stones >> (3 * shift));
+            result |= three << (2 * shift);
         }
-        return result;
+        return result & legal_moves();
     }
 
     uint64_t non_losing_moves() const {
-        uint64_t candidates = legal_moves();
-        uint64_t safe = 0;
-        while (candidates) {
-            uint64_t move = candidates & -candidates;
-            candidates ^= move;
-            if (won(current | move)) return move;
-            uint64_t next_mask = mask | move;
-            uint64_t next_player = current ^ mask;
-            bool opponent_can_win = false;
-            for (int col = 0; col < WIDTH; ++col) {
-                int level = 0;
-                while (level < HEIGHT && (next_mask & (1ULL << (col * STRIDE + level)))) ++level;
-                if (level == HEIGHT) continue;
-                uint64_t reply = 1ULL << (col * STRIDE + level);
-                if (won(next_player | reply)) {
-                    opponent_can_win = true;
-                    break;
-                }
-            }
-            if (!opponent_can_win) safe |= move;
-        }
-        return safe;
+        uint64_t wins = winning_moves(current);
+        if (wins) return wins;
+        uint64_t threats = winning_moves(current ^ mask);
+        if (__builtin_popcountll(threats) > 1) return 0;
+        if (threats) return threats;
+        return legal_moves();
     }
 
     static uint64_t mirror(uint64_t bits) {
