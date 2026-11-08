@@ -25,8 +25,11 @@ let gameOver = false;
 let aiBusy = false;
 let engineReady = false;
 let pyodide = null;
-let perfectSolverModule = null;
+let perfectSolverWorker = null;
+let perfectSolverReady = false;
 let perfectSolverLoading = null;
+let solverRequestId = 0;
+const pendingSolverRequests = new Map();
 let moveSequence = [];
 let aiLoading = null;
 let gameVersion = 0;
@@ -47,31 +50,57 @@ function setModelStatus(message, ready = false) {
 }
 
 function loadPerfectSolver() {
-  if (perfectSolverModule) return Promise.resolve();
+  if (perfectSolverReady) return Promise.resolve();
   if (perfectSolverLoading) return perfectSolverLoading;
 
   perfectSolverLoading = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = "perfect_solver.js?v=1";
-    script.onload = async () => {
-      try {
-        if (typeof CreateConnect4Solver !== "function") throw new Error("Exact solver runtime unavailable.");
-        perfectSolverModule = await CreateConnect4Solver({
-          locateFile: path => path.endsWith(".wasm") ? "perfect_solver.wasm?v=1" : path
-        });
+    const worker = new Worker("perfect_solver_worker.js?v=1");
+    perfectSolverWorker = worker;
+    let settled = false;
+
+    worker.onmessage = event => {
+      const data = event.data;
+      if (data.type === "ready") {
+        settled = true;
+        perfectSolverReady = true;
         resolve();
-      } catch (error) {
-        reject(error);
+        return;
       }
+      if (data.type === "error" && data.id === undefined) {
+        const error = new Error(data.message);
+        if (!settled) reject(error);
+        return;
+      }
+      const pending = pendingSolverRequests.get(data.id);
+      if (!pending) return;
+      pendingSolverRequests.delete(data.id);
+      if (data.error) pending.reject(new Error(data.error));
+      else pending.resolve(data.move);
     };
-    script.onerror = () => reject(new Error("Could not load the exact solver."));
-    document.head.append(script);
+
+    worker.onerror = event => {
+      const error = new Error(event.message || "The exact solver worker failed.");
+      if (!settled) reject(error);
+      for (const pending of pendingSolverRequests.values()) pending.reject(error);
+      pendingSolverRequests.clear();
+      worker.terminate();
+      perfectSolverWorker = null;
+      perfectSolverReady = false;
+    };
   }).catch(error => {
     perfectSolverLoading = null;
     throw error;
   });
 
   return perfectSolverLoading;
+}
+
+function requestExactMove(moves) {
+  return new Promise((resolve, reject) => {
+    const id = ++solverRequestId;
+    pendingSolverRequests.set(id, { resolve, reject });
+    perfectSolverWorker.postMessage({ id, moves });
+  });
 }
 
 function loadAI() {
@@ -168,16 +197,22 @@ function render() {
     : `PLAYER ${currentPlayer === "X" ? "1" : "2"}`;
 }
 
-function refreshHint() {
+async function refreshHint() {
   hintColumn = null;
   hintForPlayer = null;
   if (mode !== "pvp" || !hintEnabled[currentPlayer] || gameOver || !engineReady) return;
+
+  const sequence = moveSequence.join("");
+  const player = currentPlayer;
   try {
-    const action = Number(perfectSolverModule.ccall("c4_best_move", "number", ["string"], [moveSequence.join("")]));
+    const action = Number(await requestExactMove(sequence));
+    if (sequence !== moveSequence.join("") || player !== currentPlayer ||
+        mode !== "pvp" || !hintEnabled[player] || gameOver) return;
     if (Number.isInteger(action) && action >= 0 && action < 7 &&
         board.filter((_, index) => index % 7 === action).some(value => !value)) {
       hintColumn = action;
-      hintForPlayer = currentPlayer;
+      hintForPlayer = player;
+      render();
     }
   } catch (error) {
     console.warn("Could not calculate move hint.", error);
@@ -260,7 +295,7 @@ async function makeAIMove() {
   render();
   try {
     await loadAI();
-    const action = Number(perfectSolverModule.ccall("c4_best_move", "number", ["string"], [moveSequence.join("")]));
+    const action = Number(await requestExactMove(moveSequence.join("")));
     if (!Number.isInteger(action) || action < 0 || action >= 7 || board[action] && board[action + 7] && board[action + 14] && board[action + 21] && board[action + 28] && board[action + 35]) {
       throw new Error("The exact solver returned an invalid move.");
     }
