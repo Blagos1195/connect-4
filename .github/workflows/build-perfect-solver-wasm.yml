@@ -36,6 +36,9 @@ jobs:
           version: latest
           actions-cache-folder: emsdk-cache
 
+      - name: Download exact opening book
+        run: curl -L --fail https://github.com/PascalPons/connect4/releases/download/book/7x6_small.book -o 7x6_small.book
+
       - name: Build WebAssembly module
         run: |
           em++ perfect_solver.cpp \
@@ -43,7 +46,7 @@ jobs:
             -s MODULARIZE=1 \
             -s EXPORT_NAME=CreateConnect4Solver \
             -s ENVIRONMENT=web,node \
-            -s EXPORTED_FUNCTIONS='["_c4_best_move","_c4_score","_c4_analyze","_c4_nodes","_malloc","_free"]' \
+            -s EXPORTED_FUNCTIONS='["_c4_load_book","_c4_best_move","_c4_score","_c4_analyze","_c4_nodes","_malloc","_free"]' \
             -s EXPORTED_RUNTIME_METHODS='["ccall"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
             -s INITIAL_MEMORY=67108864 \
@@ -65,6 +68,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add perfect_solver.js perfect_solver.wasm
+          git add perfect_solver.js perfect_solver.wasm 7x6_small.book
           git commit -m "Build exact solver WebAssembly module"
           git push origin HEAD:perfect-solver-web
