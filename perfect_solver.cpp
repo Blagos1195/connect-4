@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <iterator>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -125,6 +127,73 @@ struct Position {
         uint64_t mirrored = mirror(current) + mirror(mask);
         return std::min(a, mirrored);
     }
+
+    uint64_t key3() const {
+        auto partial = [&](uint64_t& key, int col) {
+            for (uint64_t bit = 1ULL << (col * STRIDE); bit & mask; bit <<= 1) {
+                key *= 3;
+                key += (bit & current) ? 1 : 2;
+            }
+            key *= 3;
+        };
+        uint64_t forward = 0;
+        uint64_t reverse = 0;
+        for (int col = 0; col < WIDTH; ++col) partial(forward, col);
+        for (int col = WIDTH - 1; col >= 0; --col) partial(reverse, col);
+        return std::min(forward, reverse) / 3;
+    }
+};
+
+class OpeningBook {
+    std::vector<uint8_t> keys;
+    std::vector<uint8_t> values;
+    size_t size = 0;
+    int depth = -1;
+    int key_bytes = 0;
+
+public:
+    bool load_bytes(const uint8_t* data, size_t length) {
+        keys.clear();
+        values.clear();
+        size = 0;
+        depth = -1;
+        key_bytes = 0;
+        if (!data || length < 6 || data[0] != WIDTH || data[1] != HEIGHT) return false;
+        key_bytes = data[3];
+        int value_bytes = data[4];
+        if (key_bytes < 1 || key_bytes > 8 || value_bytes != 1) return false;
+        size_t entry_bytes = static_cast<size_t>(key_bytes + value_bytes);
+        if ((length - 6) % entry_bytes != 0) return false;
+        size = (length - 6) / entry_bytes;
+        if (!size) return false;
+        keys.assign(data + 6, data + 6 + size * key_bytes);
+        values.assign(data + 6 + size * key_bytes, data + length);
+        depth = data[2];
+        return true;
+    }
+
+    bool load_file(const std::string& path) {
+        std::ifstream file(path, std::ios::binary);
+        if (!file) return false;
+        std::vector<uint8_t> data(
+            (std::istreambuf_iterator<char>(file)),
+            std::istreambuf_iterator<char>()
+        );
+        return load_bytes(data.data(), data.size());
+    }
+
+    int get(const Position& p) const {
+        if (depth < 0 || p.moves > depth || !size) return -1000;
+        uint64_t key = p.key3();
+        size_t index = key % size;
+        uint64_t stored = 0;
+        for (int i = 0; i < key_bytes; ++i)
+            stored |= static_cast<uint64_t>(keys[index * key_bytes + i]) << (8 * i);
+        uint64_t mask = key_bytes == 8 ? UINT64_MAX : ((1ULL << (8 * key_bytes)) - 1);
+        if ((key & mask) != stored) return -1000;
+        uint8_t encoded = values[index];
+        return encoded ? static_cast<int>(encoded) - CELLS / 2 - 1 : -1000;
+    }
 };
 
 #if defined(__EMSCRIPTEN__)
@@ -145,6 +214,7 @@ struct Entry {
 class Solver {
     std::vector<Entry> table;
     uint64_t nodes = 0;
+    OpeningBook book;
 
     static int column_order[WIDTH];
 
@@ -169,6 +239,9 @@ class Solver {
             if (p.won(p.current | move))
                 return (CELLS + 1 - p.moves) / 2;
         }
+
+        int book_value = book.get(p);
+        if (book_value != -1000) return book_value;
 
         uint64_t moves = p.non_losing_moves();
         if (!moves) return -((CELLS - p.moves) / 2);
@@ -253,6 +326,8 @@ class Solver {
     }
 
     int solve(const Position& p) {
+        int book_value = book.get(p);
+        if (book_value != -1000) return book_value;
         uint64_t legal = p.legal_moves();
         uint64_t scan = legal;
         while (scan) {
@@ -278,6 +353,10 @@ class Solver {
 public:
     Solver() : table(TABLE_SIZE) {}
 
+    bool load_book_file(const std::string& path) { return book.load_file(path); }
+    bool load_book_bytes(const uint8_t* data, size_t length) { return book.load_bytes(data, length); }
+    int score(const Position& p) { return solve(p); }
+
     std::array<int, WIDTH> analyze(const Position& p) {
         nodes = 0;
         std::array<int, WIDTH> scores;
@@ -302,6 +381,18 @@ public:
 
     int best_move(const Position& p) {
         if (p.moves == 0) return 3;
+        if (book.get(p) != -1000) {
+            auto scores = analyze(p);
+            int best_score = -1000;
+            int best_col = -1;
+            for (int col : column_order) {
+                if (scores[col] > best_score) {
+                    best_score = scores[col];
+                    best_col = col;
+                }
+            }
+            return best_col;
+        }
         uint64_t legal = p.legal_moves();
         if (!legal) return -1;
 
@@ -384,7 +475,7 @@ bool parse_position(const char* sequence, Position& p) {
 
 extern "C" {
 
-C4_EXPORT int c4_best_move(const char* sequence) {
+C4_EXPORT int c4_load_book(const uint8_t* data, int length) {\n    return length > 0 && solver.load_book_bytes(data, static_cast<size_t>(length)) ? 1 : 0;\n}\n\nC4_EXPORT int c4_best_move(const char* sequence) {
     Position p;
     if (!parse_position(sequence, p)) return -1;
     return solver.best_move(p);
