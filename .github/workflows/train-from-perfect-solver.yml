@@ -1,0 +1,54 @@
+name: Train Connect Four From Perfect Solver
+
+on:
+  push:
+    branches:
+      - perfect-solver-training
+    paths:
+      - "scripts/train_from_perfect_solver.py"
+      - ".github/workflows/train-from-perfect-solver.yml"
+      - "connect4_ntuple.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connect-four-perfect-solver-training
+  cancel-in-progress: true
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Build Pascal Pons exact solver
+        run: |
+          git clone --depth 1 https://github.com/PascalPons/connect4.git /tmp/connect4-solver
+          make -C /tmp/connect4-solver -j2
+
+      - name: Train from scratch on exact solver decisions
+        run: |
+          python scripts/train_from_perfect_solver.py \
+            --solver /tmp/connect4-solver/c4solver \
+            --positions 5000 \
+            --epochs 12 \
+            --seed "$GITHUB_RUN_NUMBER"
+
+      - name: Save candidate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: connect-four-perfect-solver-candidate
+          path: models/candidates/solver-trained.npz
+          if-no-files-found: warn
+          retention-days: 90
