@@ -101,7 +101,8 @@ function loadPerfectSolver() {
   return perfectSolverLoading;
 }
 
-function requestExactMove(moves) {
+async function requestExactMove(moves) {
+  await loadPerfectSolver();
   return new Promise((resolve, reject) => {
     const id = ++solverRequestId;
     pendingSolverRequests.set(id, { resolve, reject });
