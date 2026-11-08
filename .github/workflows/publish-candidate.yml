@@ -2,6 +2,12 @@ name: Publish Connect Four Candidate
 
 on:
   workflow_dispatch:
+    inputs:
+      training_run_id:
+        description: Completed and compared training run ID
+        required: true
+        type: string
+        default: "42463462551"
 
 permissions:
   actions: read
@@ -23,29 +29,29 @@ jobs:
       - name: Download validated candidate
         uses: actions/download-artifact@v4
         with:
-          name: connect-four-from-scratch
+          name: connect-four-book-trained
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          run-id: 42315318730
+          run-id: ${{ inputs.training_run_id }}
           path: candidate
 
       - name: Publish best checkpoint
         run: |
-          test -s candidate/models/candidates/best.npz
-          cp candidate/models/candidates/best.npz models/connect4_ntuple.npz
-          unzip -t candidate/models/candidates/best.npz
+          test -s candidate/models/candidates/book-pretrained.npz
+          unzip -t candidate/models/candidates/book-pretrained.npz
+          cp candidate/models/candidates/book-pretrained.npz models/connect4_ntuple.npz
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           for attempt in 1 2 3; do
             git fetch origin main
             git reset --hard origin/main
-            cp candidate/models/candidates/best.npz models/connect4_ntuple.npz
+            cp candidate/models/candidates/book-pretrained.npz models/connect4_ntuple.npz
             git add models/connect4_ntuple.npz
             if git diff --cached --quiet; then
               echo "Candidate is already published."
               exit 0
             fi
-            git commit -m "Publish validated depth-two Connect Four model"
+            git commit -m "Publish full-book trained Connect Four model"
             if git push origin HEAD:main; then
               exit 0
             fi
