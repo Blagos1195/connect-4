@@ -68,7 +68,12 @@ function loadPerfectSolver() {
       }
       if (data.type === "error" && data.id === undefined) {
         const error = new Error(data.message);
-        if (!settled) reject(error);
+        if (!settled) {
+          settled = true;
+          reject(error);
+          worker.terminate();
+          perfectSolverWorker = null;
+        }
         return;
       }
       const pending = pendingSolverRequests.get(data.id);
@@ -86,6 +91,7 @@ function loadPerfectSolver() {
       worker.terminate();
       perfectSolverWorker = null;
       perfectSolverReady = false;
+      perfectSolverLoading = null;
     };
   }).catch(error => {
     perfectSolverLoading = null;
