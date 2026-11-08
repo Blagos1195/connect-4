@@ -66,7 +66,17 @@ struct Position {
         return result;
     }
 
-    uint64_t winning_moves(uint64_t stones) const {
+    uint64_t legal_moves_for(uint64_t occupied) const {
+        uint64_t result = 0;
+        for (int col = 0; col < WIDTH; ++col) {
+            int level = 0;
+            while (level < HEIGHT && (occupied & (1ULL << (col * STRIDE + level)))) ++level;
+            if (level < HEIGHT) result |= 1ULL << (col * STRIDE + level);
+        }
+        return result;
+    }
+
+    uint64_t winning_moves_for(uint64_t stones, uint64_t occupied) const {
         uint64_t result = 0;
         for (int shift : SHIFTS) {
             uint64_t three = (stones >> shift) & (stones >> (2 * shift)) & (stones >> (3 * shift));
@@ -78,7 +88,11 @@ struct Position {
             three = stones & (stones >> shift) & (stones >> (3 * shift));
             result |= three << (2 * shift);
         }
-        return result & legal_moves();
+        return result & legal_moves_for(occupied);
+    }
+
+    uint64_t winning_moves(uint64_t stones) const {
+        return winning_moves_for(stones, mask);
     }
 
     uint64_t non_losing_moves() const {
@@ -185,24 +199,45 @@ class Solver {
             if (alpha >= beta) return entry.score;
         }
 
-        int best_score = -100;
-        int best_col = -1;
+        struct MoveOption {
+            uint64_t bit;
+            int col;
+            int priority;
+            int order;
+        };
+        std::array<MoveOption, WIDTH> options;
+        int option_count = 0;
         for (int i = 0; i < WIDTH; ++i) {
-            int col = preferred >= 0 && i == 0 ? preferred : column_order[i];
+            int col = column_order[i];
             int level = 0;
             while (level < HEIGHT && (p.mask & (1ULL << (col * STRIDE + level)))) ++level;
             if (level == HEIGHT) continue;
             uint64_t move = 1ULL << (col * STRIDE + level);
             if (!(moves & move)) continue;
+            int priority = __builtin_popcountll(
+                p.winning_moves_for(p.current | move, p.mask | move)
+            );
+            if (col == preferred) priority += 1000;
+            options[option_count++] = {move, col, priority, i};
+        }
+        std::sort(options.begin(), options.begin() + option_count,
+                  [](const MoveOption& left, const MoveOption& right) {
+                      if (left.priority != right.priority) return left.priority > right.priority;
+                      return left.order < right.order;
+                  });
 
+        int best_score = -100;
+        int best_col = -1;
+        for (int i = 0; i < option_count; ++i) {
+            const MoveOption& option = options[i];
             Position child = p;
             child.current ^= child.mask;
-            child.mask |= move;
+            child.mask |= option.bit;
             ++child.moves;
             int score = -search(child, -beta, -alpha);
             if (score > best_score) {
                 best_score = score;
-                best_col = col;
+                best_col = option.col;
             }
             alpha = std::max(alpha, score);
             if (alpha >= beta) break;
