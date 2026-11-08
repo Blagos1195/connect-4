@@ -14,7 +14,7 @@ def print_board(game, current_player):
                 cells[r][c] = "X" if current_player == 0 else "O"
             elif game.opponent & bit:
                 cells[r][c] = "O" if current_player == 0 else "X"
-    print("\\n  " + " ".join(str(c + 1) for c in range(COLS)))
+    print("\n  " + " ".join(str(c + 1) for c in range(COLS)))
     for row in cells:
         print("  " + " ".join(row))
     print()
