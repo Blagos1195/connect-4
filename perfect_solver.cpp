@@ -225,45 +225,37 @@ class Solver {
 public:
     Solver() : table(TABLE_SIZE) {}
 
-    int best_move(const Position& p) {
+    std::array<int, WIDTH> analyze(const Position& p) {
         nodes = 0;
-        uint64_t legal = p.legal_moves();
-        if (!legal) return -1;
-        for (int col : column_order) {
-            int level = 0;
-            while (level < HEIGHT && (p.mask & (1ULL << (col * STRIDE + level)))) ++level;
-            if (level < HEIGHT && p.won(p.current | (1ULL << (col * STRIDE + level))))
-                return col;
-        }
-
-        uint64_t moves = p.non_losing_moves();
-        if (!moves) {
-            for (int col : column_order) {
-                int level = 0;
-                while (level < HEIGHT && (p.mask & (1ULL << (col * STRIDE + level)))) ++level;
-                if (level < HEIGHT) return col;
-            }
-        }
-
-        int best = -100;
-        int best_col = -1;
-        int alpha = -100;
-        for (int col : column_order) {
+        std::array<int, WIDTH> scores;
+        scores.fill(-1000);
+        for (int col = 0; col < WIDTH; ++col) {
             int level = 0;
             while (level < HEIGHT && (p.mask & (1ULL << (col * STRIDE + level)))) ++level;
             if (level == HEIGHT) continue;
             uint64_t move = 1ULL << (col * STRIDE + level);
-            if (!(moves & move)) continue;
+            if (p.won(p.current | move)) {
+                scores[col] = (CELLS + 1 - p.moves) / 2;
+                continue;
+            }
             Position child = p;
             child.current ^= child.mask;
             child.mask |= move;
             ++child.moves;
-            int score = -search(child, -100, -alpha);
-            if (score > best) {
-                best = score;
+            scores[col] = -search(child, -100, 100);
+        }
+        return scores;
+    }
+
+    int best_move(const Position& p) {
+        auto scores = analyze(p);
+        int best_score = -1000;
+        int best_col = -1;
+        for (int col : column_order) {
+            if (scores[col] > best_score) {
+                best_score = scores[col];
                 best_col = col;
             }
-            alpha = std::max(alpha, score);
         }
         return best_col;
     }
