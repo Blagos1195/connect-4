@@ -59,13 +59,14 @@ def main():
     for board, actual_line, expected_line in zip(boards, actual_lines, expected_lines):
         fields = actual_line.split()
         oracle_fields = expected_line.split()
-        if len(fields) < 1 or len(oracle_fields) != 8:
+        if len(fields) < 2 or len(oracle_fields) != 8:
             raise SystemExit(f"Malformed solver output for {board}: {actual_line!r} / {expected_line!r}")
         move = int(fields[0])
         scores = [int(value) for value in oracle_fields[1:]]
         best = max(value for value in scores if value != -1000)
-        if move < 0 or move > 6 or scores[move] != best:
-            raise SystemExit(f"Wrong move for {board}: selected={move}, oracle={scores}")
+        score = int(fields[1])
+        if move < 0 or move > 6 or scores[move] != best or score != best:
+            raise SystemExit(f"Wrong result for {board}: selected={move}, score={score}, oracle={scores}")
     print(f"PASS: {len(boards)} positions matched the exact solver's optimal move set")
 
 
