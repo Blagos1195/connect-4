@@ -47,7 +47,7 @@ jobs:
             -s EXPORT_NAME=CreateConnect4Solver \
             -s ENVIRONMENT=web,node \
             -s EXPORTED_FUNCTIONS='["_c4_load_book","_c4_best_move","_c4_score","_c4_analyze","_c4_nodes","_malloc","_free"]' \
-            -s EXPORTED_RUNTIME_METHODS='["ccall"]' \
+            -s EXPORTED_RUNTIME_METHODS='["ccall","HEAPU8"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
             -s INITIAL_MEMORY=67108864 \
             -s MAXIMUM_MEMORY=268435456 \
