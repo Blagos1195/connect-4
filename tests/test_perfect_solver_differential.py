@@ -45,7 +45,7 @@ def positions(count, seed):
 
 def main():
     ours, oracle = sys.argv[1:3]
-    boards = ["", "4", "44", "444", "4444", "434343", "343434", "1234567", "7654321"] + positions(80, 94117)
+    opening = subprocess.run([ours], input="\\n", text=True, capture_output=True, check=True, timeout=30)\n    if int(opening.stdout.split()[0]) != 3:\n        raise SystemExit("The empty-board opening must be the centre column")\n    boards = ["4", "44", "444", "4444", "434343", "343434", "1234567", "7654321"] + positions(80, 94117)
     payload = "".join(board + "\n" for board in boards)
     actual = subprocess.run([ours], input=payload, text=True, capture_output=True, check=True, timeout=900)
     expected = subprocess.run([oracle, "-a", "-b", "/dev/null"], input=payload, text=True, capture_output=True, check=True, timeout=900)
