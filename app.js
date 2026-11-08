@@ -34,6 +34,8 @@ let bookUpdateAvailable = false;
 let perfectSolverLoading = null;
 let bookDownloadWorker = null;
 let bookDownloadPromise = null;
+let resolveBookInstall = null;
+let rejectBookInstall = null;
 let solverRequestId = 0;
 const pendingSolverRequests = new Map();
 let moveSequence = [];
@@ -74,11 +76,17 @@ function loadPerfectSolver() {
       }
       if (data.type === "book-installed") {
         updateBookStatus(true, false);
+        resolveBookInstall?.();
+        resolveBookInstall = null;
+        rejectBookInstall = null;
         return;
       }
       if (data.type === "book-error") {
         updateBookStatus(bookInstalled, bookUpdateAvailable);
         bookStatus.textContent = data.message;
+        rejectBookInstall?.(new Error(data.message));
+        resolveBookInstall = null;
+        rejectBookInstall = null;
         return;
       }
       if (data.type === "error" && data.id === undefined) {
@@ -223,6 +231,7 @@ async function refreshHint() {
   const sequence = moveSequence.join("");
   const player = currentPlayer;
   try {
+    if (bookDownloadPromise) await bookDownloadPromise;
     const action = Number(await requestExactMove(sequence));
     if (sequence !== moveSequence.join("") || player !== currentPlayer ||
         mode !== "pvp" || !hintEnabled[player] || gameOver) return;
@@ -323,6 +332,7 @@ async function makeAIMove() {
   render();
   try {
     await loadAI();
+    if (bookDownloadPromise) await bookDownloadPromise;
     const action = Number(await requestExactMove(sequence));
     if (version !== gameVersion || sequence !== moveSequence.join("")) return;
     if (!Number.isInteger(action) || action < 0 || action >= 7 || board[action] !== "") {
@@ -426,8 +436,11 @@ bookButton.addEventListener("click", async () => {
       if (data.type === "downloaded") {
         try {
           await loadPerfectSolver();
+          resolveBookInstall = resolve;
+          rejectBookInstall = reject;
           perfectSolverWorker.postMessage({ type: "install-book", data: data.data, version: data.version }, [data.data]);
-          resolve();
+          bookDownloadWorker?.terminate();
+          bookDownloadWorker = null;
         } catch (error) {
           reject(error);
         }
