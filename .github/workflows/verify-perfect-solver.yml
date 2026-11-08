@@ -28,6 +28,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Confirm source revision
+        run: git rev-parse HEAD
+
       - name: Build candidate solver
         run: g++ -std=c++17 -O3 -DNDEBUG -Wall -Wextra perfect_solver.cpp -o /tmp/perfect_solver
 
