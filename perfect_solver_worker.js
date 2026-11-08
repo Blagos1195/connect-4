@@ -99,19 +99,12 @@ async function restoreBook() {
   }
 }
 
-async function downloadBook() {
-  try {
-    latestBookVersion = await fetchLatestBookVersion();
-    const response = await fetch("7x6_small.book.gz?v=" + latestBookVersion);
-    if (!response.ok) throw new Error("Could not download the opening book.");
-    const compressed = await response.arrayBuffer();
-    await loadBook(compressed);
-    await writeRecord("assets", { key: OPENING_BOOK_KEY, version: latestBookVersion, data: compressed });
-    bookUpdateAvailable = false;
-    self.postMessage({ type: "book-downloaded" });
-  } catch (error) {
-    self.postMessage({ type: "book-error", message: error?.message || String(error) });
-  }
+async function installBook(compressed, version) {
+  await loadBook(compressed);
+  await writeRecord("assets", { key: OPENING_BOOK_KEY, version, data: compressed });
+  latestBookVersion = version;
+  bookUpdateAvailable = false;
+  self.postMessage({ type: "book-installed" });
 }
 
 function cacheKey(moves) {
@@ -161,8 +154,8 @@ self.onmessage = async event => {
   const { id, moves, type } = event.data;
   try {
     await ready;
-    if (type === "download-book") {
-      await downloadBook();
+    if (type === "install-book") {
+      await installBook(new Uint8Array(event.data.data), event.data.version);
       return;
     }
     const move = await findMove(moves);
