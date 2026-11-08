@@ -1,4 +1,5 @@
 import argparse
+import subprocess
 from pathlib import Path
 
 from connect4_ntuple import ConnectFour, NTupleAgent, ROWS, COLS
@@ -79,5 +80,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import subprocess
     main()
