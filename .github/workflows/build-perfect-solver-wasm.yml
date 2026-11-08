@@ -40,7 +40,7 @@ jobs:
       - name: Download exact opening book
         run: |
           curl -L --fail https://github.com/PascalPons/connect4/releases/download/book/7x6_small.book -o 7x6_small.book
-          gzip -9 -k 7x6_small.book
+          gzip -9 -kf 7x6_small.book
           gzip -t 7x6_small.book.gz
           gzip -dc 7x6_small.book.gz | cmp - 7x6_small.book
           echo "Original book: $(wc -c < 7x6_small.book) bytes"
