@@ -38,7 +38,13 @@ jobs:
           actions-cache-folder: emsdk-cache
 
       - name: Download exact opening book
-        run: curl -L --fail https://github.com/PascalPons/connect4/releases/download/book/7x6_small.book -o 7x6_small.book
+        run: |
+          curl -L --fail https://github.com/PascalPons/connect4/releases/download/book/7x6_small.book -o 7x6_small.book
+          gzip -9 -k 7x6_small.book
+          gzip -t 7x6_small.book.gz
+          gzip -dc 7x6_small.book.gz | cmp - 7x6_small.book
+          echo "Original book: $(wc -c < 7x6_small.book) bytes"
+          echo "Compressed book: $(wc -c < 7x6_small.book.gz) bytes"
 
       - name: Build WebAssembly module
         run: |
@@ -65,11 +71,11 @@ jobs:
       - name: Test native exact solver interface
         run: python tests/test_exact_solver_interface.py
 
-      - name: Commit generated browser engine
+      - name: Commit generated browser engine and compressed book
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add perfect_solver.js perfect_solver.wasm 7x6_small.book
+          git add perfect_solver.js perfect_solver.wasm 7x6_small.book 7x6_small.book.gz
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "Build exact solver WebAssembly module"
           git push origin "HEAD:${GITHUB_REF_NAME}"
