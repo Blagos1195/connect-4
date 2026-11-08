@@ -2,9 +2,17 @@
 
 ## Connect Four
 
-The browser version is served from the repository root through GitHub Pages. It runs the same Python game engine and n-tuple agent in Pyodide. If `models/connect4_ntuple.npz` is present, the browser loads it; otherwise the AI uses the tactical baseline until a trained checkpoint is added.
+The browser game is served from the repository root through GitHub Pages. Its AI uses the exact-search engine in `perfect_solver.cpp`, compiled to WebAssembly. The browser no longer uses the trained n-tuple checkpoint to choose moves.
 
-The Connect Four trainer now uses a learned n-tuple value function with temporal-difference self-play. It does not use Expectimax or a full game-tree search.
+The native game uses the same C++ engine. On first launch, `play_connect4.py` compiles it with `g++` or `clang++` and keeps the solver running so its transposition table is reused between moves. If no C++ compiler is available, it falls back to the trained model.
+
+The solver searches to the end of the game using alpha-beta search, tactical move pruning, symmetry-aware transpositions and threat-based move ordering. It has no learned evaluation cutoff. A returned move is optimal for the current position, although search time depends on the position and available memory.
+
+Connect Four is a first-player win under perfect play. That means a perfect AI playing second cannot prevent a loss against a perfect first player. The engine still chooses the mathematically best move in every position.
+
+## Training
+
+The n-tuple self-play trainer remains available for experiments. Its checkpoint is retained, but it is not used by the exact-search AI when the solver is available.
 
 Install:
 
@@ -24,9 +32,9 @@ Resume a checkpoint:
 python main.py --games 100000 --resume models/connect4_ntuple.npz
 ```
 
-The default checkpoint is `models/connect4_ntuple.npz`. Training progress is appended to `training_connect4.csv`. Periodic evaluations play against a random opponent. Checkpoints are written atomically by NumPy's archive writer.
+The default checkpoint is `models/connect4_ntuple.npz`. Training progress is appended to `training_connect4.csv`.
 
-Play against the model:
+Play against the AI:
 
 ```bash
 python play_connect4.py
@@ -37,7 +45,3 @@ Play AI against itself:
 ```bash
 python play_connect4.py --mode self-play
 ```
-
-The policy includes a one-ply tactical safety check: it takes an immediate win and avoids moves that allow an immediate opponent win when a safe alternative exists. Strategic evaluation is learned from self-play.
-
-The old DQN implementation was removed from the main training entrypoints because its replay-buffer perspective handling and batched episode resets made its training data unreliable. The previous neural-network and replay-memory modules are no longer used by the Connect Four trainer.
