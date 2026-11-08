@@ -297,18 +297,22 @@ function playColumn(column) {
 }
 
 async function makeAIMove() {
+  const version = gameVersion;
+  const sequence = moveSequence.join("");
   aiBusy = true;
   updateTurnText();
   render();
   try {
     await loadAI();
-    const action = Number(await requestExactMove(moveSequence.join("")));
+    const action = Number(await requestExactMove(sequence));
+    if (version !== gameVersion || sequence !== moveSequence.join("")) return;
     if (!Number.isInteger(action) || action < 0 || action >= 7 || board[action] && board[action + 7] && board[action + 14] && board[action + 21] && board[action + 28] && board[action + 35]) {
       throw new Error("The exact solver returned an invalid move.");
     }
     aiBusy = false;
     playColumn(action);
   } catch (error) {
+    if (version !== gameVersion) return;
     console.error(error);
     aiBusy = false;
     gameOver = true;
