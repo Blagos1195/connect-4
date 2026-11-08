@@ -1,11 +1,15 @@
-name: Compare Connect Four Book Models
+name: Compare Connect Four Book Model
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/candidate-comparison.yml'
+    inputs:
+      training_run_id:
+        description: Completed training run ID (leave blank for the automatic comparison)
+        required: false
+        type: string
+  workflow_run:
+    workflows: ["Train From Connect Four Solved Opening Book"]
+    types: [completed]
 
 permissions:
   actions: read
@@ -13,6 +17,7 @@ permissions:
 
 jobs:
   compare:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -33,23 +38,17 @@ jobs:
           name: connect-four-book-trained
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          run-id: 42416710461
+          run-id: ${{ inputs.training_run_id || github.event.workflow_run.id }}
           path: artifacts
 
-      - name: Compare database-pretrained model with published model
+      - name: Compare the database-trained model with the published model
         run: |
-          python scripts/compare_candidates.py --candidate artifacts/models/candidates/book-pretrained.npz --champion models/connect4_ntuple.npz --games 500 --depth 2 --seed 810000 --output comparison-pretrained.json
+          python scripts/compare_candidates.py --candidate artifacts/models/candidates/book-pretrained.npz --champion models/connect4_ntuple.npz --games 500 --depth 2 --seed 810000 --output comparison-book.json
 
-      - name: Compare self-play model with published model
-        run: |
-          python scripts/compare_candidates.py --candidate artifacts/models/candidates/latest.npz --champion models/connect4_ntuple.npz --games 500 --depth 2 --seed 910000 --output comparison-selfplay.json
-
-      - name: Save comparison reports
+      - name: Save comparison report
         uses: actions/upload-artifact@v4
         with:
           name: connect-four-book-model-comparison
-          path: |
-            comparison-pretrained.json
-            comparison-selfplay.json
+          path: comparison-book.json
           if-no-files-found: error
           retention-days: 90
