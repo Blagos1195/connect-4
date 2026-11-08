@@ -25,6 +25,9 @@ let gameOver = false;
 let aiBusy = false;
 let engineReady = false;
 let pyodide = null;
+let perfectSolverModule = null;
+let perfectSolverLoading = null;
+let moveSequence = [];
 let aiLoading = null;
 let gameVersion = 0;
 let board = Array(42).fill("");
@@ -43,6 +46,34 @@ function setModelStatus(message, ready = false) {
   modelStatus.parentElement.querySelector(".status-dot").style.background = ready ? "#83b99c" : "#999";
 }
 
+function loadPerfectSolver() {
+  if (perfectSolverModule) return Promise.resolve();
+  if (perfectSolverLoading) return perfectSolverLoading;
+
+  perfectSolverLoading = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "perfect_solver.js?v=1";
+    script.onload = async () => {
+      try {
+        if (typeof CreateConnect4Solver !== "function") throw new Error("Exact solver runtime unavailable.");
+        perfectSolverModule = await CreateConnect4Solver({
+          locateFile: path => path.endsWith(".wasm") ? "perfect_solver.wasm?v=1" : path
+        });
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    };
+    script.onerror = () => reject(new Error("Could not load the exact solver."));
+    document.head.append(script);
+  }).catch(error => {
+    perfectSolverLoading = null;
+    throw error;
+  });
+
+  return perfectSolverLoading;
+}
+
 function loadAI() {
   if (engineReady) return Promise.resolve();
   if (aiLoading) return aiLoading;
@@ -51,7 +82,8 @@ function loadAI() {
     setModelStatus("Loading Python runtime...");
     const [runtime, response] = await Promise.all([
       loadPyodide(),
-      fetch("connect4_ntuple.py?v=c7c1f24")
+      fetch("connect4_ntuple.py?v=c7c1f24"),
+      loadPerfectSolver()
     ]);
     if (!response.ok) throw new Error("Could not load connect4_ntuple.py");
     const pythonSource = await response.text();
@@ -59,24 +91,12 @@ function loadAI() {
     await pyodide.loadPackage("numpy");
     pyodide.FS.writeFile("connect4_ntuple.py", pythonSource);
     await pyodide.runPythonAsync(
-      "import connect4_ntuple as c4\nbrowser_game = c4.ConnectFour()\nbrowser_agent = c4.NTupleAgent()"
+      "import connect4_ntuple as c4\nbrowser_game = c4.ConnectFour()"
     );
 
-    let modelLoaded = false;
-    try {
-      const modelResponse = await fetch("models/connect4_ntuple.npz");
-      if (modelResponse.ok) {
-        const modelBytes = new Uint8Array(await modelResponse.arrayBuffer());
-        pyodide.FS.writeFile("connect4_ntuple.npz", modelBytes);
-        await pyodide.runPythonAsync("browser_agent.load('connect4_ntuple.npz')");
-        modelLoaded = true;
-      }
-    } catch (error) {
-      console.warn("No trained checkpoint loaded.", error);
-    }
 
     engineReady = true;
-    setModelStatus(modelLoaded ? "Python AI ready · trained model loaded" : "Python AI ready · no trained model", true);
+    setModelStatus("Exact solver ready", true);
   })().catch(error => {
     console.error(error);
     setModelStatus("Python AI failed to load");
@@ -153,7 +173,7 @@ function refreshHint() {
   hintForPlayer = null;
   if (mode !== "pvp" || !hintEnabled[currentPlayer] || gameOver || !engineReady) return;
   try {
-    const action = Number(pyodide.runPython("browser_agent.choose_action(browser_game, 0.0)"));
+    const action = Number(perfectSolverModule.ccall("c4_best_move", "number", ["string"], [moveSequence.join("")]));
     if (Number.isInteger(action) && action >= 0 && action < 7 &&
         board.filter((_, index) => index % 7 === action).some(value => !value)) {
       hintColumn = action;
@@ -217,6 +237,7 @@ function finishGame(winner) {
 
 function playColumn(column) {
   pyodide.globals.set("browser_column", column);
+  moveSequence.push(String(column + 1));
   const resultProxy = pyodide.runPython("browser_game.play(browser_column)");
   const [won, draw] = resultProxy.toJs();
   resultProxy.destroy();
@@ -239,7 +260,7 @@ async function makeAIMove() {
   render();
   try {
     await loadAI();
-    const action = Number(pyodide.runPython("browser_agent.choose_action(browser_game, 0.0)"));
+    const action = Number(perfectSolverModule.ccall("c4_best_move", "number", ["string"], [moveSequence.join("")]));
     if (!Number.isInteger(action) || action < 0 || action >= 7 || board[action] && board[action + 7] && board[action + 14] && board[action + 21] && board[action + 28] && board[action + 35]) {
       throw new Error("The Python agent returned an invalid move.");
     }
@@ -260,6 +281,7 @@ async function makeAIMove() {
 
 function resetPythonGame() {
   pyodide.runPython("browser_game = c4.ConnectFour()");
+  moveSequence = [];
   board = Array(42).fill("");
   gameOver = false;
   aiBusy = false;
