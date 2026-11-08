@@ -63,6 +63,7 @@ def generate_positions(count, seed):
             won, _ = game.play(col)
             sequence.append(str(col + 1))
             if won:
+                sequence.pop()
                 break
         if len(sequence) < 8 or game.moves >= ROWS * COLS:
             continue
@@ -133,8 +134,7 @@ def main():
         if not legal_scores:
             skipped += 1
             continue
-        best_score = max(score for _, score in legal_scores)
-        for col, score in legal_scores:
+            for col, score in legal_scores:
             bit = 1 << (col * STRIDE + int(heights[col]))
             next_heights = heights.copy()
             next_heights[col] += 1
@@ -211,7 +211,6 @@ def main():
 
     predictions = predict(currents, opponents, heights_all, agent.weights)
     top1 = 0
-    topk = 0
     evaluated = 0
     for parent in validation_parents:
         start, end = groups[parent], groups[parent + 1]
@@ -221,8 +220,6 @@ def main():
         best = max(exact_scores[start:end])
         if exact_scores[chosen] == best:
             top1 += 1
-        if np.any(exact_scores[start:end] == best):
-            topk += 1
         evaluated += 1
 
     print(
