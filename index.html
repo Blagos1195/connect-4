@@ -6,14 +6,13 @@
   <meta name="theme-color" content="#ffffff">
   <title>Connect Four</title>
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js"></script>
-  <script src="app.js?v=c7c1f24" defer></script>
+  <script src="app.js?v=exact-2" defer></script>
 </head>
 <body>
   <main class="shell">
     <div class="page-heading">
       <h1>Connect Four</h1>
-      <span class="top-note"><span class="status-dot"></span><span id="model-status">Loading Python AI...</span></span>
+      <span class="top-note"><span class="status-dot"></span><span id="model-status">Loading exact solver...</span></span>
     </div>
     <section class="game-card" aria-label="Connect Four game">
       <div class="mode-picker" role="group" aria-label="Game mode">
@@ -41,7 +40,7 @@
           <div class="board" id="board" role="grid" aria-label="Connect Four board"></div>
           <div class="board-footer">
             <span><i class="x-disc"></i> Player 1</span>
-            <span><i class="o-disc"></i> <span id="opponent-name">Trained AI</span></span>
+            <span><i class="o-disc"></i> <span id="opponent-name">AI</span></span>
             <button id="secret-hint" class="secret-hint-button" type="button" aria-label="Toggle move hint" title="Toggle move hint" hidden></button>
           </div>
         </section>
