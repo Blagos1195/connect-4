@@ -162,9 +162,14 @@ class Solver {
 
         int lower = -((CELLS - p.moves) / 2);
         int upper = (CELLS - 1 - p.moves) / 2;
-        if (alpha < lower) alpha = lower;
-        if (beta > upper) beta = upper;
-        if (alpha >= beta) return alpha;
+        if (alpha < lower) {
+            alpha = lower;
+            if (alpha >= beta) return alpha;
+        }
+        if (beta > upper) {
+            beta = upper;
+            if (alpha >= beta) return beta;
+        }
 
         int original_alpha = alpha;
         int original_beta = beta;
