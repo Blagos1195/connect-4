@@ -1,0 +1,47 @@
+name: Verify perfect Connect Four solver
+
+on:
+  push:
+    branches:
+      - main
+      - perfect-solver-web
+    paths:
+      - "perfect_solver.cpp"
+      - "tests/test_perfect_solver_differential.py"
+      - "tests/test_exact_solver_interface.py"
+      - "7x6_small.book"
+      - "exact_solver.py"
+      - ".github/workflows/verify-perfect-solver.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connect-four-perfect-solver-verification
+  cancel-in-progress: true
+
+jobs:
+  differential-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Confirm source revision
+        run: git rev-parse HEAD
+
+      - name: Build candidate solver
+        run: g++ -std=c++17 -O3 -DNDEBUG -Wall -Wextra perfect_solver.cpp -o /tmp/perfect_solver
+
+      - name: Build independent exact reference solver
+        run: |
+          git clone --depth 1 https://github.com/PascalPons/connect4.git /tmp/reference
+          make -C /tmp/reference -j2
+
+      - name: Compare optimal moves on random legal positions
+        run: python tests/test_perfect_solver_differential.py /tmp/perfect_solver /tmp/reference/c4solver

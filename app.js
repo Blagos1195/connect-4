@@ -25,6 +25,12 @@ let gameOver = false;
 let aiBusy = false;
 let engineReady = false;
 let pyodide = null;
+let perfectSolverWorker = null;
+let perfectSolverReady = false;
+let perfectSolverLoading = null;
+let solverRequestId = 0;
+const pendingSolverRequests = new Map();
+let moveSequence = [];
 let aiLoading = null;
 let gameVersion = 0;
 let board = Array(42).fill("");
@@ -43,15 +49,88 @@ function setModelStatus(message, ready = false) {
   modelStatus.parentElement.querySelector(".status-dot").style.background = ready ? "#83b99c" : "#999";
 }
 
+function loadPerfectSolver() {
+  if (perfectSolverReady) return Promise.resolve();
+  if (perfectSolverLoading) return perfectSolverLoading;
+
+  perfectSolverLoading = new Promise((resolve, reject) => {
+    const worker = new Worker("perfect_solver_worker.js?v=1");
+    perfectSolverWorker = worker;
+    let settled = false;
+
+    worker.onmessage = event => {
+      const data = event.data;
+      if (data.type === "ready") {
+        settled = true;
+        perfectSolverReady = true;
+        resolve();
+        return;
+      }
+      if (data.type === "error" && data.id === undefined) {
+        const error = new Error(data.message);
+        if (!settled) {
+          settled = true;
+          reject(error);
+          worker.terminate();
+          perfectSolverWorker = null;
+        }
+        return;
+      }
+      const pending = pendingSolverRequests.get(data.id);
+      if (!pending) return;
+      pendingSolverRequests.delete(data.id);
+      if (data.error) pending.reject(new Error(data.error));
+      else pending.resolve(data.move);
+    };
+
+    worker.onerror = event => {
+      const error = new Error(event.message || "The exact solver worker failed.");
+      if (!settled) reject(error);
+      for (const pending of pendingSolverRequests.values()) pending.reject(error);
+      pendingSolverRequests.clear();
+      worker.terminate();
+      perfectSolverWorker = null;
+      perfectSolverReady = false;
+      perfectSolverLoading = null;
+    };
+  }).catch(error => {
+    perfectSolverLoading = null;
+    throw error;
+  });
+
+  return perfectSolverLoading;
+}
+
+async function resetSolverWorker() {
+  if (perfectSolverWorker) perfectSolverWorker.terminate();
+  for (const pending of pendingSolverRequests.values()) {
+    pending.reject(new Error("The game was reset."));
+  }
+  pendingSolverRequests.clear();
+  perfectSolverWorker = null;
+  perfectSolverReady = false;
+  perfectSolverLoading = null;
+}
+
+async function requestExactMove(moves) {
+  await loadPerfectSolver();
+  return new Promise((resolve, reject) => {
+    const id = ++solverRequestId;
+    pendingSolverRequests.set(id, { resolve, reject });
+    perfectSolverWorker.postMessage({ id, moves });
+  });
+}
+
 function loadAI() {
   if (engineReady) return Promise.resolve();
   if (aiLoading) return aiLoading;
 
   aiLoading = (async () => {
-    setModelStatus("Loading Python runtime...");
+    setModelStatus("Loading exact solver...");
     const [runtime, response] = await Promise.all([
       loadPyodide(),
-      fetch("connect4_ntuple.py?v=c7c1f24")
+      fetch("connect4_ntuple.py?v=c7c1f24"),
+      loadPerfectSolver()
     ]);
     if (!response.ok) throw new Error("Could not load connect4_ntuple.py");
     const pythonSource = await response.text();
@@ -59,27 +138,15 @@ function loadAI() {
     await pyodide.loadPackage("numpy");
     pyodide.FS.writeFile("connect4_ntuple.py", pythonSource);
     await pyodide.runPythonAsync(
-      "import connect4_ntuple as c4\nbrowser_game = c4.ConnectFour()\nbrowser_agent = c4.NTupleAgent()"
+      "import connect4_ntuple as c4\nbrowser_game = c4.ConnectFour()"
     );
 
-    let modelLoaded = false;
-    try {
-      const modelResponse = await fetch("models/connect4_ntuple.npz");
-      if (modelResponse.ok) {
-        const modelBytes = new Uint8Array(await modelResponse.arrayBuffer());
-        pyodide.FS.writeFile("connect4_ntuple.npz", modelBytes);
-        await pyodide.runPythonAsync("browser_agent.load('connect4_ntuple.npz')");
-        modelLoaded = true;
-      }
-    } catch (error) {
-      console.warn("No trained checkpoint loaded.", error);
-    }
 
     engineReady = true;
-    setModelStatus(modelLoaded ? "Python AI ready · trained model loaded" : "Python AI ready · no trained model", true);
+    setModelStatus("Exact solver ready", true);
   })().catch(error => {
     console.error(error);
-    setModelStatus("Python AI failed to load");
+    setModelStatus("Exact solver failed to load");
     aiLoading = null;
     throw error;
   });
@@ -148,16 +215,22 @@ function render() {
     : `PLAYER ${currentPlayer === "X" ? "1" : "2"}`;
 }
 
-function refreshHint() {
+async function refreshHint() {
   hintColumn = null;
   hintForPlayer = null;
   if (mode !== "pvp" || !hintEnabled[currentPlayer] || gameOver || !engineReady) return;
+
+  const sequence = moveSequence.join("");
+  const player = currentPlayer;
   try {
-    const action = Number(pyodide.runPython("browser_agent.choose_action(browser_game, 0.0)"));
+    const action = Number(await requestExactMove(sequence));
+    if (sequence !== moveSequence.join("") || player !== currentPlayer ||
+        mode !== "pvp" || !hintEnabled[player] || gameOver) return;
     if (Number.isInteger(action) && action >= 0 && action < 7 &&
         board.filter((_, index) => index % 7 === action).some(value => !value)) {
       hintColumn = action;
-      hintForPlayer = currentPlayer;
+      hintForPlayer = player;
+      render();
     }
   } catch (error) {
     console.warn("Could not calculate move hint.", error);
@@ -181,7 +254,7 @@ function updateTurnText() {
     roundLabel.textContent = currentPlayer === aiPlayer ? "THE AI IS THINKING" : "YOUR TURN";
     statusHeading.textContent = currentPlayer === aiPlayer ? "The AI is choosing." : "Choose a column.";
     nextTitle.textContent = currentPlayer === aiPlayer ? "AI turn" : "Your move";
-    nextCopy.textContent = currentPlayer === aiPlayer ? "The Python agent is selecting a column." : `You play ${currentPlayer === "X" ? "red" : "yellow"}. The AI plays ${aiPlayer === "X" ? "red" : "yellow"}.`;
+    nextCopy.textContent = currentPlayer === aiPlayer ? "The exact solver is choosing a move." : `You play ${currentPlayer === "X" ? "red" : "yellow"}. The AI plays ${aiPlayer === "X" ? "red" : "yellow"}.`;
   } else {
     const player = currentPlayer === "X" ? "1" : "2";
     roundLabel.textContent = `PLAYER ${player}'S TURN`;
@@ -217,6 +290,7 @@ function finishGame(winner) {
 
 function playColumn(column) {
   pyodide.globals.set("browser_column", column);
+  moveSequence.push(String(column + 1));
   const resultProxy = pyodide.runPython("browser_game.play(browser_column)");
   const [won, draw] = resultProxy.toJs();
   resultProxy.destroy();
@@ -234,18 +308,22 @@ function playColumn(column) {
 }
 
 async function makeAIMove() {
+  const version = gameVersion;
+  const sequence = moveSequence.join("");
   aiBusy = true;
   updateTurnText();
   render();
   try {
     await loadAI();
-    const action = Number(pyodide.runPython("browser_agent.choose_action(browser_game, 0.0)"));
+    const action = Number(await requestExactMove(sequence));
+    if (version !== gameVersion || sequence !== moveSequence.join("")) return;
     if (!Number.isInteger(action) || action < 0 || action >= 7 || board[action] && board[action + 7] && board[action + 14] && board[action + 21] && board[action + 28] && board[action + 35]) {
-      throw new Error("The Python agent returned an invalid move.");
+      throw new Error("The exact solver returned an invalid move.");
     }
     aiBusy = false;
     playColumn(action);
   } catch (error) {
+    if (version !== gameVersion) return;
     console.error(error);
     aiBusy = false;
     gameOver = true;
@@ -260,6 +338,7 @@ async function makeAIMove() {
 
 function resetPythonGame() {
   pyodide.runPython("browser_game = c4.ConnectFour()");
+  moveSequence = [];
   board = Array(42).fill("");
   gameOver = false;
   aiBusy = false;
@@ -271,6 +350,7 @@ function resetPythonGame() {
 
 function startGame(resetScores = false) {
   const version = ++gameVersion;
+  if (pendingSolverRequests.size) resetSolverWorker();
   board = Array(42).fill("");
   currentPlayer = Math.random() < 0.5 ? "X" : "O";
   aiPlayer = currentPlayer === "X" ? "O" : "X";
