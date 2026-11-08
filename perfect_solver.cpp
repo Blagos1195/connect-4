@@ -266,6 +266,48 @@ public:
     }
 
     int best_move(const Position& p) {
+        uint64_t legal = p.legal_moves();
+        if (!legal) return -1;
+
+        uint64_t wins = p.winning_moves(p.current);
+        if (wins) {
+            for (int col : column_order) {
+                int level = 0;
+                while (level < HEIGHT && (p.mask & (1ULL << (col * STRIDE + level)))) ++level;
+                if (level < HEIGHT && (wins & (1ULL << (col * STRIDE + level))) &&
+                    p.won(p.current | (1ULL << (col * STRIDE + level)))) return col;
+            }
+        }
+
+        uint64_t safe = p.non_losing_moves();
+        if (!safe) {
+            for (int col : column_order) {
+                int level = 0;
+                while (level < HEIGHT && (p.mask & (1ULL << (col * STRIDE + level)))) ++level;
+                if (level < HEIGHT) return col;
+            }
+        }
+
+        if (p.moves >= CELLS - 2) {
+            for (int col : column_order) {
+                int level = 0;
+                while (level < HEIGHT && (p.mask & (1ULL << (col * STRIDE + level)))) ++level;
+                if (level < HEIGHT && (safe & (1ULL << (col * STRIDE + level)))) return col;
+            }
+        }
+
+        int value = solve(p);
+        search(p, value - 1, value);
+
+        uint64_t key = p.key();
+        const Entry& entry = table[hash_key(key) & TABLE_MASK];
+        if (entry.flag && entry.key == key) {
+            int col = p.is_mirrored() ? WIDTH - 1 - entry.best : entry.best;
+            int level = 0;
+            while (level < HEIGHT && (p.mask & (1ULL << (col * STRIDE + level)))) ++level;
+            if (level < HEIGHT && (safe & (1ULL << (col * STRIDE + level)))) return col;
+        }
+
         auto scores = analyze(p);
         int best_score = -1000;
         int best_col = -1;
