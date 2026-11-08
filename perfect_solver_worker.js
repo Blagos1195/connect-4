@@ -2,12 +2,15 @@ importScripts("perfect_solver.js?v=2");
 
 const DATABASE_NAME = "connect-four-cache";
 const DATABASE_VERSION = 1;
-const OPENING_BOOK_KEY = "opening-book-v1";
+const OPENING_BOOK_KEY = "opening-book";
+const BOOK_VERSION_URL = "book-version.json?v=1";
 const SOLVER_VERSION = "solver-v1";
 
 let solver = null;
 let database = null;
 let bookAvailable = false;
+let bookUpdateAvailable = false;
+let latestBookVersion = 1;
 
 function openDatabase() {
   return new Promise(resolve => {
@@ -73,11 +76,24 @@ async function loadBook(compressed) {
   bookAvailable = true;
 }
 
+async function fetchLatestBookVersion() {
+  try {
+    const response = await fetch(BOOK_VERSION_URL, { cache: "no-store" });
+    if (!response.ok) throw new Error("Book version check failed.");
+    const data = await response.json();
+    if (Number.isInteger(data.version) && data.version > 0) return data.version;
+  } catch {}
+  return 1;
+}
+
 async function restoreBook() {
   const saved = await readRecord("assets", OPENING_BOOK_KEY);
   if (!saved) return;
+  latestBookVersion = await fetchLatestBookVersion();
+  latestBookVersion = Math.max(latestBookVersion, saved.version || 1);
   try {
     await loadBook(saved.data);
+    bookUpdateAvailable = (saved.version || 1) < latestBookVersion;
   } catch {
     await deleteRecord("assets", OPENING_BOOK_KEY);
   }
@@ -85,11 +101,13 @@ async function restoreBook() {
 
 async function downloadBook() {
   try {
-    const response = await fetch("7x6_small.book.gz?v=1");
+    latestBookVersion = await fetchLatestBookVersion();
+    const response = await fetch("7x6_small.book.gz?v=" + latestBookVersion);
     if (!response.ok) throw new Error("Could not download the opening book.");
     const compressed = await response.arrayBuffer();
     await loadBook(compressed);
-    await writeRecord("assets", { key: OPENING_BOOK_KEY, data: compressed });
+    await writeRecord("assets", { key: OPENING_BOOK_KEY, version: latestBookVersion, data: compressed });
+    bookUpdateAvailable = false;
     self.postMessage({ type: "book-downloaded" });
   } catch (error) {
     self.postMessage({ type: "book-error", message: error?.message || String(error) });
@@ -133,7 +151,7 @@ const ready = (async () => {
   });
   database = await openDatabase();
   await restoreBook();
-  self.postMessage({ type: "ready", bookAvailable });
+  self.postMessage({ type: "ready", bookAvailable, bookUpdateAvailable });
 })().catch(error => {
   self.postMessage({ type: "error", message: error?.message || String(error) });
   throw error;

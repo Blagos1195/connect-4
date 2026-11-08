@@ -28,6 +28,8 @@ let aiBusy = false;
 let engineReady = false;
 let perfectSolverWorker = null;
 let perfectSolverReady = false;
+let bookInstalled = false;
+let bookUpdateAvailable = false;
 let perfectSolverLoading = null;
 let solverRequestId = 0;
 const pendingSolverRequests = new Map();
@@ -54,7 +56,7 @@ function loadPerfectSolver() {
   if (perfectSolverLoading) return perfectSolverLoading;
 
   perfectSolverLoading = new Promise((resolve, reject) => {
-    const worker = new Worker("perfect_solver_worker.js?v=3");
+    const worker = new Worker("perfect_solver_worker.js?v=4");
     perfectSolverWorker = worker;
     let settled = false;
 
@@ -63,19 +65,16 @@ function loadPerfectSolver() {
       if (data.type === "ready") {
         settled = true;
         perfectSolverReady = true;
-        updateBookStatus(data.bookAvailable);
+        updateBookStatus(data.bookAvailable, data.bookUpdateAvailable);
         resolve();
         return;
       }
       if (data.type === "book-downloaded") {
-        updateBookStatus(true);
-        bookButton.disabled = true;
-        bookButton.textContent = "Opening book downloaded";
+        updateBookStatus(true, false);
         return;
       }
       if (data.type === "book-error") {
-        bookButton.disabled = false;
-        bookButton.textContent = "Retry opening book download";
+        updateBookStatus(bookInstalled, bookUpdateAvailable);
         bookStatus.textContent = data.message;
         return;
       }
@@ -117,12 +116,18 @@ function loadPerfectSolver() {
   return perfectSolverLoading;
 }
 
-function updateBookStatus(available) {
-  bookButton.disabled = Boolean(available);
-  bookButton.textContent = available ? "Opening book downloaded" : "Download opening book (5 MB)";
-  bookStatus.textContent = available
-    ? "Saved on this device. Future visits will use the cached copy."
-    : "Optional performance upgrade. Best downloaded over Wi-Fi.";
+function updateBookStatus(available, updateAvailable = false) {
+  bookInstalled = Boolean(available);
+  bookUpdateAvailable = Boolean(updateAvailable);
+  bookButton.disabled = bookInstalled && !bookUpdateAvailable;
+  bookButton.textContent = bookUpdateAvailable
+    ? "Update opening book (5 MB)"
+    : bookInstalled ? "Opening book downloaded" : "Download opening book (5 MB)";
+  bookStatus.textContent = bookUpdateAvailable
+    ? "A newer opening book is available. Updating is optional."
+    : bookInstalled
+      ? "Saved on this device. Future visits will use the cached copy."
+      : "Optional performance upgrade. Best downloaded over Wi-Fi.";
 }
 
 function resetSolverWorker() {
@@ -408,7 +413,7 @@ secretHintButton.addEventListener("click", () => {
 bookButton.addEventListener("click", () => {
   if (!engineReady || bookButton.disabled) return;
   bookButton.disabled = true;
-  bookButton.textContent = "Downloading opening book...";
+  bookButton.textContent = bookInstalled ? "Updating opening book..." : "Downloading opening book...";
   bookStatus.textContent = "Downloading and saving this device's copy.";
   perfectSolverWorker.postMessage({ type: "download-book" });
 });

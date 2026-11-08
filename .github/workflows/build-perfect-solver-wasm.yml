@@ -13,6 +13,7 @@ on:
       - "play_connect4.py"
       - "app.js"
       - "perfect_solver_worker.js"
+      - "book-version.json"
       - ".github/workflows/build-perfect-solver-wasm.yml"
   workflow_dispatch:
 
