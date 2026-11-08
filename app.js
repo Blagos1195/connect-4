@@ -112,7 +112,7 @@ async function resetSolverWorker() {
   perfectSolverLoading = null;
 }
 
-function requestExactMove(moves) {
+async function requestExactMove(moves) {
   await loadPerfectSolver();
   return new Promise((resolve, reject) => {
     const id = ++solverRequestId;
