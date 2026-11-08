@@ -6,7 +6,7 @@ The browser game is served from the repository root through GitHub Pages. Its AI
 
 The native game uses the same C++ engine. On first launch, `play_connect4.py` compiles it with `g++` or `clang++` and keeps the solver running so its transposition table is reused between moves. If no C++ compiler is available, it falls back to the trained model.
 
-The solver searches to the end of the game using alpha-beta search, tactical move pruning, symmetry-aware transpositions and threat-based move ordering. It has no learned evaluation cutoff. A returned move is optimal for the current position, although search time depends on the position and available memory.
+The solver uses a precomputed opening book followed by exact alpha-beta search, tactical move pruning, symmetry-aware transpositions and threat-based move ordering. It has no learned evaluation cutoff. A returned move is optimal for the current position, although search time depends on the position and available memory. The opening-book data is from Pascal Pons’s official Connect Four solver release; see [the original project](https://github.com/PascalPons/connect4).
 
 Connect Four is a first-player win under perfect play. That means a perfect AI playing second cannot prevent a loss against a perfect first player. The engine still chooses the mathematically best move in every position.
 
