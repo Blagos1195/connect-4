@@ -40,15 +40,27 @@ jobs:
         run: |
           python scripts/train_from_perfect_solver.py \
             --solver /tmp/connect4-solver/c4solver \
-            --positions 5000 \
-            --epochs 12 \
+            --positions 20000 \
+            --epochs 16 \
             --seed "$GITHUB_RUN_NUMBER"
 
-      - name: Save candidate
+      - name: Compare candidate with published model
+        run: |
+          python scripts/compare_candidates.py \
+            --candidate models/candidates/solver-trained.npz \
+            --champion models/connect4_ntuple.npz \
+            --games 200 \
+            --depth 2 \
+            --seed 910000 \
+            --output solver-comparison.json
+
+      - name: Save training and comparison results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: connect-four-perfect-solver-candidate
-          path: models/candidates/solver-trained.npz
+          path: |
+            models/candidates/solver-trained.npz
+            solver-comparison.json
           if-no-files-found: warn
           retention-days: 90
