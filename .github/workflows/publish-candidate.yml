@@ -1,13 +1,10 @@
 name: Publish Connect Four Candidate
 
 on:
-  workflow_dispatch:
-    inputs:
-      training_run_id:
-        description: Completed and compared training run ID
-        required: true
-        type: string
-        default: "42463462551"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-candidate.yml"
 
 permissions:
   actions: read
@@ -32,7 +29,7 @@ jobs:
           name: connect-four-book-trained
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          run-id: ${{ inputs.training_run_id }}
+          run-id: 42463462551
           path: candidate
 
       - name: Publish best checkpoint
