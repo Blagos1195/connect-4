@@ -7,6 +7,9 @@ on:
     paths:
       - "perfect_solver.cpp"
       - "tests/test_perfect_solver_wasm.js"
+      - "tests/test_exact_solver_interface.py"
+      - "exact_solver.py"
+      - "play_connect4.py"
       - ".github/workflows/build-perfect-solver-wasm.yml"
   workflow_dispatch:
 
@@ -47,6 +50,9 @@ jobs:
 
       - name: Test WebAssembly engine
         run: node tests/test_perfect_solver_wasm.js
+
+      - name: Test native exact solver interface
+        run: python tests/test_exact_solver_interface.py
 
       - name: Commit generated browser engine
         run: |
