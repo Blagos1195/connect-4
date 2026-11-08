@@ -79,7 +79,7 @@ function loadAI() {
   if (aiLoading) return aiLoading;
 
   aiLoading = (async () => {
-    setModelStatus("Loading Python runtime...");
+    setModelStatus("Loading exact solver...");
     const [runtime, response] = await Promise.all([
       loadPyodide(),
       fetch("connect4_ntuple.py?v=c7c1f24"),
@@ -201,7 +201,7 @@ function updateTurnText() {
     roundLabel.textContent = currentPlayer === aiPlayer ? "THE AI IS THINKING" : "YOUR TURN";
     statusHeading.textContent = currentPlayer === aiPlayer ? "The AI is choosing." : "Choose a column.";
     nextTitle.textContent = currentPlayer === aiPlayer ? "AI turn" : "Your move";
-    nextCopy.textContent = currentPlayer === aiPlayer ? "The Python agent is selecting a column." : `You play ${currentPlayer === "X" ? "red" : "yellow"}. The AI plays ${aiPlayer === "X" ? "red" : "yellow"}.`;
+    nextCopy.textContent = currentPlayer === aiPlayer ? "The exact solver is choosing a move." : `You play ${currentPlayer === "X" ? "red" : "yellow"}. The AI plays ${aiPlayer === "X" ? "red" : "yellow"}.`;
   } else {
     const player = currentPlayer === "X" ? "1" : "2";
     roundLabel.textContent = `PLAYER ${player}'S TURN`;
@@ -262,7 +262,7 @@ async function makeAIMove() {
     await loadAI();
     const action = Number(perfectSolverModule.ccall("c4_best_move", "number", ["string"], [moveSequence.join("")]));
     if (!Number.isInteger(action) || action < 0 || action >= 7 || board[action] && board[action + 7] && board[action + 14] && board[action + 21] && board[action + 28] && board[action + 35]) {
-      throw new Error("The Python agent returned an invalid move.");
+      throw new Error("The exact solver returned an invalid move.");
     }
     aiBusy = false;
     playColumn(action);
