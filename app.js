@@ -101,7 +101,18 @@ function loadPerfectSolver() {
   return perfectSolverLoading;
 }
 
-async function requestExactMove(moves) {
+async function resetSolverWorker() {
+  if (perfectSolverWorker) perfectSolverWorker.terminate();
+  for (const pending of pendingSolverRequests.values()) {
+    pending.reject(new Error("The game was reset."));
+  }
+  pendingSolverRequests.clear();
+  perfectSolverWorker = null;
+  perfectSolverReady = false;
+  perfectSolverLoading = null;
+}
+
+function requestExactMove(moves) {
   await loadPerfectSolver();
   return new Promise((resolve, reject) => {
     const id = ++solverRequestId;
@@ -339,6 +350,7 @@ function resetPythonGame() {
 
 function startGame(resetScores = false) {
   const version = ++gameVersion;
+  if (pendingSolverRequests.size) resetSolverWorker();
   board = Array(42).fill("");
   currentPlayer = Math.random() < 0.5 ? "X" : "O";
   aiPlayer = currentPlayer === "X" ? "O" : "X";
