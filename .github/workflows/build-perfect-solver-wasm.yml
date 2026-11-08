@@ -6,6 +6,7 @@ on:
       - perfect-solver-web
     paths:
       - "perfect_solver.cpp"
+      - "tests/test_perfect_solver_wasm.js"
       - ".github/workflows/build-perfect-solver-wasm.yml"
   workflow_dispatch:
 
@@ -43,6 +44,9 @@ jobs:
             -s INITIAL_MEMORY=33554432 \
             -s MAXIMUM_MEMORY=268435456 \
             -o perfect_solver.js
+
+      - name: Test WebAssembly engine
+        run: node tests/test_perfect_solver_wasm.js
 
       - name: Commit generated browser engine
         run: |
