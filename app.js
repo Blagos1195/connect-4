@@ -99,7 +99,7 @@ function loadAI() {
     setModelStatus("Exact solver ready", true);
   })().catch(error => {
     console.error(error);
-    setModelStatus("Python AI failed to load");
+    setModelStatus("Exact solver failed to load");
     aiLoading = null;
     throw error;
   });
