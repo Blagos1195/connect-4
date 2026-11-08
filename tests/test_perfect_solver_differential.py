@@ -45,7 +45,7 @@ def positions(count, seed):
 
 def main():
     ours, oracle = sys.argv[1:3]
-    boards = positions(80, 94117)
+    boards = ["", "4", "44", "444", "4444", "43434343", "34343434", "1234567", "7654321"] + positions(80, 94117)
     payload = "".join(board + "\n" for board in boards)
     actual = subprocess.run([ours], input=payload, text=True, capture_output=True, check=True, timeout=900)
     expected = subprocess.run([oracle, "-a", "-b", "/dev/null"], input=payload, text=True, capture_output=True, check=True, timeout=900)
