@@ -18,6 +18,7 @@ const opponentName = document.querySelector("#opponent-name");
 const secretHintButton = document.querySelector("#secret-hint");
 const bookButton = document.querySelector("#download-book");
 const bookStatus = document.querySelector("#book-status");
+bookButton.disabled = true;
 
 let mode = "ai";
 let currentPlayer = "X";
