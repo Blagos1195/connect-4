@@ -9,7 +9,7 @@ async function main() {
   const cases = [
     { moves: "", expected: 3 },
     { moves: "172736", expected: 3 },
-    { moves: "717263", expected: 3 }
+    { moves: "716273", expected: 3 }
   ];
 
   for (const item of cases) {
