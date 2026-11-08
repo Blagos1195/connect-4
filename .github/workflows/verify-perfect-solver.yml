@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: connect-four-perfect-solver-verification
+  group: connect-four-perfect-solver-verification-v2
   cancel-in-progress: true
 
 jobs:
