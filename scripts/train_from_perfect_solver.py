@@ -96,7 +96,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--solver", required=True)
     parser.add_argument("--positions", type=int, default=20000)
-    parser.add_argument("--epochs", type=int, default=16)
+    parser.add_argument("--epochs", type=int, default=64)
     parser.add_argument("--learning-rate", type=float, default=0.015)
     parser.add_argument("--seed", type=int, default=41)
     parser.add_argument("--output", default="models/candidates/solver-trained.npz")
