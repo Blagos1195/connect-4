@@ -16,6 +16,19 @@ from bitbully_databases import BitBullyDatabases
 from connect4_ntuple import COLS, ROWS, STRIDE, PATTERNS, NTupleAgent, _pattern_indices
 
 
+def board_from_state(current, opponent, heights):
+    board = [[0] * COLS for _ in range(ROWS)]
+    for col in range(COLS):
+        for level in range(int(heights[col])):
+            bit = 1 << (col * STRIDE + level)
+            row = ROWS - 1 - level
+            if current & bit:
+                board[row][col] = 1
+            elif opponent & bit:
+                board[row][col] = 2
+    return board
+
+
 def decode_position(key):
     encoded = int(key) & 0xFFFFFFFF
     bits = [(encoded >> shift) & 1 for shift in range(31, -1, -1)]
