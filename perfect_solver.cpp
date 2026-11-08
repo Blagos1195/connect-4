@@ -114,7 +114,7 @@ struct Position {
 };
 
 #if defined(__EMSCRIPTEN__)
-constexpr uint32_t TABLE_BITS = 18;
+constexpr uint32_t TABLE_BITS = 20;
 #else
 constexpr uint32_t TABLE_BITS = 22;
 #endif
