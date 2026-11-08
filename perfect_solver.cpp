@@ -308,6 +308,14 @@ C4_EXPORT int c4_score(const char* sequence) {
     return solver.best_move(p);
 }
 
+C4_EXPORT int c4_analyze(const char* sequence, int* output) {
+    Position p;
+    if (!parse_position(sequence, p) || !output) return 0;
+    auto scores = solver.analyze(p);
+    for (int i = 0; i < WIDTH; ++i) output[i] = scores[i];
+    return 1;
+}
+
 C4_EXPORT double c4_nodes() {
     return static_cast<double>(solver.node_count());
 }
