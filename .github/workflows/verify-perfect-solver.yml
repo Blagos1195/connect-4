@@ -28,6 +28,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Download exact opening book
+        run: curl -L --fail https://github.com/PascalPons/connect4/releases/download/book/7x6_small.book -o 7x6_small.book
+
       - name: Confirm source revision
         run: git rev-parse HEAD
 
