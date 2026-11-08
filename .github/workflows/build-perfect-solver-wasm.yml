@@ -50,7 +50,12 @@ jobs:
             -s MAXIMUM_MEMORY=268435456 \
             -o perfect_solver.js
 
-      - name: Check browser scripts\n        run: |\n          node --check app.js\n          node --check perfect_solver_worker.js\n\n      - name: Test WebAssembly engine
+      - name: Check browser scripts
+        run: |
+          node --check app.js
+          node --check perfect_solver_worker.js
+
+      - name: Test WebAssembly engine
         run: node tests/test_perfect_solver_wasm.js
 
       - name: Test native exact solver interface
