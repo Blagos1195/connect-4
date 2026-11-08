@@ -56,7 +56,7 @@ function loadPerfectSolver() {
   if (perfectSolverLoading) return perfectSolverLoading;
 
   perfectSolverLoading = new Promise((resolve, reject) => {
-    const worker = new Worker("perfect_solver_worker.js?v=4");
+    const worker = new Worker("perfect_solver_worker.js?v=5");
     perfectSolverWorker = worker;
     let settled = false;
 
