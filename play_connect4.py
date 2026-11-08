@@ -1,8 +1,6 @@
 import argparse
-import subprocess
-from pathlib import Path
 
-from connect4_ntuple import ConnectFour, NTupleAgent, ROWS, COLS
+from connect4_ntuple import ConnectFour, ROWS, COLS
 from exact_solver import ExactSolver
 
 
@@ -16,7 +14,7 @@ def print_board(game, current_player):
                 cells[r][c] = "X" if current_player == 0 else "O"
             elif game.opponent & bit:
                 cells[r][c] = "O" if current_player == 0 else "X"
-    print("\n  " + " ".join(str(c + 1) for c in range(COLS)))
+    print("\\n  " + " ".join(str(c + 1) for c in range(COLS)))
     for row in cells:
         print("  " + " ".join(row))
     print()
@@ -24,21 +22,17 @@ def print_board(game, current_player):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="models/connect4_ntuple.npz")
     parser.add_argument("--mode", choices=("human", "self-play"), default="human")
     args = parser.parse_args()
 
-    agent = NTupleAgent()
-    if Path(args.model).exists():
-        agent.load(args.model)
-
-    exact_solver = None
     try:
         exact_solver = ExactSolver()
-        print("Exact solver ready.")
-    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
-        print(f"Exact solver unavailable: {error}")
-        print("Using the trained model instead.")
+    except (OSError, RuntimeError) as error:
+        raise SystemExit(
+            f"Exact solver unavailable: {error} Install g++ or clang++ to play."
+        ) from error
+
+    print("Exact solver ready.")
 
     try:
         while True:
@@ -48,8 +42,7 @@ def main():
             while game.moves < ROWS * COLS:
                 print_board(game, turn)
                 if args.mode == "self-play" or turn == 1:
-                    action = (exact_solver.choose_move("".join(move_sequence))
-                              if exact_solver else agent.choose_action(game, 0.0))
+                    action = exact_solver.choose_move("".join(move_sequence))
                     print(f"AI chooses column {action + 1}")
                 else:
                     while True:
@@ -75,8 +68,7 @@ def main():
             if input("Play again? (y/n): ").strip().lower() != "y":
                 break
     finally:
-        if exact_solver:
-            exact_solver.close()
+        exact_solver.close()
 
 
 if __name__ == "__main__":
