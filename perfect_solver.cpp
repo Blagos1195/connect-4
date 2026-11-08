@@ -156,19 +156,26 @@ class Solver {
         uint64_t legal = p.legal_moves();
         if (!legal) return 0;
 
-        uint64_t immediate = 0;
         uint64_t scan = legal;
         while (scan) {
             uint64_t move = scan & -scan;
             scan ^= move;
-            if (p.won(p.current | move)) {
+            if (p.won(p.current | move))
                 return (CELLS + 1 - p.moves) / 2;
-            }
         }
 
+        uint64_t moves = p.non_losing_moves();
+        if (!moves) return -((CELLS - p.moves) / 2);
         if (p.moves >= CELLS - 2) return 0;
 
+        int lower = -((CELLS - p.moves) / 2);
+        int upper = (CELLS - 1 - p.moves) / 2;
+        if (alpha < lower) alpha = lower;
+        if (beta > upper) beta = upper;
+        if (alpha >= beta) return alpha;
+
         int original_alpha = alpha;
+        int original_beta = beta;
         uint64_t key = p.key();
         Entry& entry = table[hash_key(key) & TABLE_MASK];
         int preferred = -1;
@@ -180,24 +187,14 @@ class Solver {
             if (alpha >= beta) return entry.score;
         }
 
-        uint64_t moves = p.non_losing_moves();
-        if (!moves) return -((CELLS - p.moves) / 2);
-
         int best_score = -100;
         int best_col = -1;
         for (int i = 0; i < WIDTH; ++i) {
-            int col = column_order[i];
-            uint64_t move = 0;
-            if (col == preferred) {
-                int level = 0;
-                while (level < HEIGHT && (p.mask & (1ULL << (col * STRIDE + level)))) ++level;
-                if (level < HEIGHT) move = 1ULL << (col * STRIDE + level);
-            }
-            if (!move) {
-                int level = 0;
-                while (level < HEIGHT && (p.mask & (1ULL << (col * STRIDE + level)))) ++level;
-                if (level < HEIGHT) move = 1ULL << (col * STRIDE + level);
-            }
+            int col = preferred >= 0 && i == 0 ? preferred : column_order[i];
+            int level = 0;
+            while (level < HEIGHT && (p.mask & (1ULL << (col * STRIDE + level)))) ++level;
+            if (level == HEIGHT) continue;
+            uint64_t move = 1ULL << (col * STRIDE + level);
             if (!(moves & move)) continue;
 
             Position child = p;
@@ -217,9 +214,32 @@ class Solver {
         updated.key = key;
         updated.score = static_cast<int16_t>(best_score);
         updated.best = static_cast<uint8_t>(best_col < 0 ? 0 : best_col);
-        updated.flag = best_score <= original_alpha ? 3 : best_score >= beta ? 2 : 1;
+        updated.flag = best_score <= original_alpha ? 3 : best_score >= original_beta ? 2 : 1;
         entry = updated;
         return best_score;
+    }
+
+    int solve(const Position& p) {
+        uint64_t legal = p.legal_moves();
+        uint64_t scan = legal;
+        while (scan) {
+            uint64_t move = scan & -scan;
+            scan ^= move;
+            if (p.won(p.current | move))
+                return (CELLS + 1 - p.moves) / 2;
+        }
+
+        int lower = -((CELLS - p.moves) / 2);
+        int upper = (CELLS + 1 - p.moves) / 2;
+        while (lower < upper) {
+            int middle = lower + (upper - lower) / 2;
+            if (middle <= 0 && lower / 2 < middle) middle = lower / 2;
+            else if (middle >= 0 && upper / 2 > middle) middle = upper / 2;
+            int result = search(p, middle, middle + 1);
+            if (result <= middle) upper = result;
+            else lower = result;
+        }
+        return lower;
     }
 
 public:
@@ -242,7 +262,7 @@ public:
             child.current ^= child.mask;
             child.mask |= move;
             ++child.moves;
-            scores[col] = -search(child, -100, 100);
+            scores[col] = -solve(child);
         }
         return scores;
     }
