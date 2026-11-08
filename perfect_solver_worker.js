@@ -161,6 +161,10 @@ self.onmessage = async event => {
     const move = await findMove(moves);
     self.postMessage({ id, move });
   } catch (error) {
-    self.postMessage({ id, error: error?.message || String(error) });
+    if (type === "install-book") {
+      self.postMessage({ type: "book-error", message: error?.message || String(error) });
+    } else {
+      self.postMessage({ id, error: error?.message || String(error) });
+    }
   }
 };
