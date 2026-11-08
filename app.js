@@ -17,21 +17,18 @@ const scoreOName = document.querySelector("#score-o-name");
 const opponentName = document.querySelector("#opponent-name");
 const secretHintButton = document.querySelector("#secret-hint");
 
-
 let mode = "ai";
 let currentPlayer = "X";
 let aiPlayer = "O";
 let gameOver = false;
 let aiBusy = false;
 let engineReady = false;
-let pyodide = null;
 let perfectSolverWorker = null;
 let perfectSolverReady = false;
 let perfectSolverLoading = null;
 let solverRequestId = 0;
 const pendingSolverRequests = new Map();
 let moveSequence = [];
-let aiLoading = null;
 let gameVersion = 0;
 let board = Array(42).fill("");
 let winningLine = [];
@@ -85,7 +82,10 @@ function loadPerfectSolver() {
 
     worker.onerror = event => {
       const error = new Error(event.message || "The exact solver worker failed.");
-      if (!settled) reject(error);
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
       for (const pending of pendingSolverRequests.values()) pending.reject(error);
       pendingSolverRequests.clear();
       worker.terminate();
@@ -101,7 +101,7 @@ function loadPerfectSolver() {
   return perfectSolverLoading;
 }
 
-async function resetSolverWorker() {
+function resetSolverWorker() {
   if (perfectSolverWorker) perfectSolverWorker.terminate();
   for (const pending of pendingSolverRequests.values()) {
     pending.reject(new Error("The game was reset."));
@@ -121,44 +121,12 @@ async function requestExactMove(moves) {
   });
 }
 
-function loadAI() {
-  if (engineReady) return Promise.resolve();
-  if (aiLoading) return aiLoading;
-
-  aiLoading = (async () => {
-    setModelStatus("Loading exact solver...");
-    const [runtime, response] = await Promise.all([
-      loadPyodide(),
-      fetch("connect4_ntuple.py?v=c7c1f24"),
-      loadPerfectSolver()
-    ]);
-    if (!response.ok) throw new Error("Could not load connect4_ntuple.py");
-    const pythonSource = await response.text();
-    pyodide = runtime;
-    await pyodide.loadPackage("numpy");
-    pyodide.FS.writeFile("connect4_ntuple.py", pythonSource);
-    await pyodide.runPythonAsync(
-      "import connect4_ntuple as c4\nbrowser_game = c4.ConnectFour()"
-    );
-
-
-    engineReady = true;
-    setModelStatus("Exact solver ready", true);
-  })().catch(error => {
-    console.error(error);
-    setModelStatus("Exact solver failed to load");
-    aiLoading = null;
-    throw error;
-  });
-
-  return aiLoading;
-}
-
-function pythonBoard() {
-  const proxy = pyodide.runPython("c4.board_cells(browser_game)");
-  const relative = proxy.toJs();
-  proxy.destroy();
-  return relative.flat().map(value => value === "current" ? currentPlayer : value === "opponent" ? otherPlayer(currentPlayer) : "");
+async function loadAI() {
+  if (engineReady) return;
+  setModelStatus("Loading exact solver...");
+  await loadPerfectSolver();
+  engineReady = true;
+  setModelStatus("Exact solver ready", true);
 }
 
 function findWinningLine(position, player) {
@@ -182,7 +150,6 @@ function findWinningLine(position, player) {
 }
 
 function render() {
-  if (engineReady) board = pythonBoard();
   boardElement.replaceChildren();
   board.forEach((value, index) => {
     const cell = document.createElement("div");
@@ -197,7 +164,7 @@ function render() {
   });
 
   columnButtons.forEach((button, col) => {
-    const full = engineReady && board.filter((_, index) => index % 7 === col).every(Boolean);
+    const full = board[col] !== "";
     button.disabled = !engineReady || gameOver || aiBusy || full || (mode === "ai" && currentPlayer === aiPlayer);
     button.classList.toggle("hinted", mode === "pvp" && hintForPlayer === currentPlayer &&
       hintEnabled[currentPlayer] && hintColumn === col && !gameOver);
@@ -211,7 +178,7 @@ function render() {
   turnPill.style.visibility = gameOver ? "hidden" : "visible";
   turnDisc.className = currentPlayer === "X" ? "x-disc" : "o-disc";
   turnLabel.textContent = mode === "ai"
-    ? currentPlayer === "X" ? "YOUR MOVE" : "AI THINKING"
+    ? currentPlayer === aiPlayer ? "AI THINKING" : "YOUR MOVE"
     : `PLAYER ${currentPlayer === "X" ? "1" : "2"}`;
 }
 
@@ -226,8 +193,7 @@ async function refreshHint() {
     const action = Number(await requestExactMove(sequence));
     if (sequence !== moveSequence.join("") || player !== currentPlayer ||
         mode !== "pvp" || !hintEnabled[player] || gameOver) return;
-    if (Number.isInteger(action) && action >= 0 && action < 7 &&
-        board.filter((_, index) => index % 7 === action).some(value => !value)) {
+    if (Number.isInteger(action) && action >= 0 && action < 7 && board[action] === "") {
       hintColumn = action;
       hintForPlayer = player;
       render();
@@ -292,22 +258,28 @@ function finishGame(winner) {
 }
 
 function playColumn(column) {
-  pyodide.globals.set("browser_column", column);
-  moveSequence.push(String(column + 1));
-  const resultProxy = pyodide.runPython("browser_game.play(browser_column)");
-  const [won, draw] = resultProxy.toJs();
-  resultProxy.destroy();
-  const mover = currentPlayer;
-  currentPlayer = otherPlayer(currentPlayer);
-  board = pythonBoard();
-  refreshHint();
+  if (!Number.isInteger(column) || column < 0 || column >= 7 || board[column] !== "") return;
+  let row = 5;
+  while (row >= 0 && board[row * 7 + column] !== "") row--;
+  if (row < 0) return;
 
-  if (won) finishGame(mover);
-  else if (draw) finishGame(null);
-  else {
-    updateTurnText();
-    render();
+  const mover = currentPlayer;
+  board[row * 7 + column] = mover;
+  moveSequence.push(String(column + 1));
+  currentPlayer = otherPlayer(currentPlayer);
+
+  if (findWinningLine(board, mover).length) {
+    finishGame(mover);
+    return;
   }
+  if (board.every(Boolean)) {
+    finishGame(null);
+    return;
+  }
+
+  updateTurnText();
+  render();
+  refreshHint();
 }
 
 async function makeAIMove() {
@@ -320,7 +292,7 @@ async function makeAIMove() {
     await loadAI();
     const action = Number(await requestExactMove(sequence));
     if (version !== gameVersion || sequence !== moveSequence.join("")) return;
-    if (!Number.isInteger(action) || action < 0 || action >= 7 || board[action] && board[action + 7] && board[action + 14] && board[action + 21] && board[action + 28] && board[action + 35]) {
+    if (!Number.isInteger(action) || action < 0 || action >= 7 || board[action] !== "") {
       throw new Error("The exact solver returned an invalid move.");
     }
     aiBusy = false;
@@ -339,22 +311,11 @@ async function makeAIMove() {
   }
 }
 
-function resetPythonGame() {
-  pyodide.runPython("browser_game = c4.ConnectFour()");
-  moveSequence = [];
-  board = Array(42).fill("");
-  gameOver = false;
-  aiBusy = false;
-  winningLine = [];
-  updateModeLabels();
-  updateTurnText();
-  render();
-}
-
 function startGame(resetScores = false) {
   const version = ++gameVersion;
   if (pendingSolverRequests.size) resetSolverWorker();
   board = Array(42).fill("");
+  moveSequence = [];
   currentPlayer = "X";
   aiPlayer = Math.random() < 0.5 ? "X" : "O";
   gameOver = false;
@@ -376,10 +337,11 @@ function startGame(resetScores = false) {
   render();
   loadAI().then(() => {
     if (version === gameVersion) {
-      resetPythonGame();
+      render();
       if (mode === "ai" && currentPlayer === aiPlayer) makeAIMove();
     }
   }).catch(error => {
+    if (version !== gameVersion) return;
     console.error(error);
     statusHeading.textContent = "The game engine couldn't start.";
     roundLabel.textContent = "AI ERROR";
