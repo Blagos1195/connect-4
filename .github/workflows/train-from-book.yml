@@ -1,6 +1,13 @@
 name: Train From Connect Four Solved Opening Book
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/train-from-book.yml"
+      - "scripts/train_from_book.py"
+      - "requirements.txt"
   workflow_dispatch:
 
 permissions:
@@ -26,7 +33,7 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Verify and train from the complete exact database
+      - name: Train on all 4.2 million exact database positions
         run: |
           python scripts/train_from_book.py --model models/connect4_ntuple.npz --output models/candidates/latest.npz --best-output models/candidates/book-pretrained.npz --epochs 3 --learning-rate 0.00002 --seed "$GITHUB_RUN_NUMBER"
 
