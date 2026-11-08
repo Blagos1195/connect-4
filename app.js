@@ -16,6 +16,8 @@ const scoreXName = document.querySelector("#score-x-name");
 const scoreOName = document.querySelector("#score-o-name");
 const opponentName = document.querySelector("#opponent-name");
 const secretHintButton = document.querySelector("#secret-hint");
+const bookButton = document.querySelector("#download-book");
+const bookStatus = document.querySelector("#book-status");
 
 let mode = "ai";
 let currentPlayer = "X";
@@ -60,7 +62,20 @@ function loadPerfectSolver() {
       if (data.type === "ready") {
         settled = true;
         perfectSolverReady = true;
+        updateBookStatus(data.bookAvailable);
         resolve();
+        return;
+      }
+      if (data.type === "book-downloaded") {
+        updateBookStatus(true);
+        bookButton.disabled = true;
+        bookButton.textContent = "Opening book downloaded";
+        return;
+      }
+      if (data.type === "book-error") {
+        bookButton.disabled = false;
+        bookButton.textContent = "Retry opening book download";
+        bookStatus.textContent = data.message;
         return;
       }
       if (data.type === "error" && data.id === undefined) {
@@ -99,6 +114,14 @@ function loadPerfectSolver() {
   });
 
   return perfectSolverLoading;
+}
+
+function updateBookStatus(available) {
+  bookButton.disabled = Boolean(available);
+  bookButton.textContent = available ? "Opening book downloaded" : "Download opening book (5 MB)";
+  bookStatus.textContent = available
+    ? "Saved on this device. Future visits will use the cached copy."
+    : "Optional performance upgrade. Best downloaded over Wi-Fi.";
 }
 
 function resetSolverWorker() {
@@ -379,6 +402,14 @@ secretHintButton.addEventListener("click", () => {
   hintEnabled[currentPlayer] = !hintEnabled[currentPlayer];
   refreshHint();
   render();
+});
+
+bookButton.addEventListener("click", () => {
+  if (!engineReady || bookButton.disabled) return;
+  bookButton.disabled = true;
+  bookButton.textContent = "Downloading opening book...";
+  bookStatus.textContent = "Downloading and saving this device's copy.";
+  perfectSolverWorker.postMessage({ type: "download-book" });
 });
 
 document.querySelector("#new-game").addEventListener("click", () => startGame());

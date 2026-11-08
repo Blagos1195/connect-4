@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#ffffff">
   <title>Connect Four</title>
   <link rel="stylesheet" href="style.css">
-  <script src="app.js?v=exact-2" defer></script>
+  <script src="app.js?v=exact-3" defer></script>
 </head>
 <body>
   <main class="shell">
@@ -61,6 +61,10 @@
           </div>
           <div class="draw-count"><span>Draws</span><b id="score-draw">0</b></div>
           <p class="next-copy"><b id="next-title">Your move</b><br><span id="next-copy">You play red. The AI plays yellow.</span></p>
+          <div class="book-option">
+            <button class="text-button" id="download-book" type="button">Download opening book (5 MB)</button>
+            <p id="book-status" aria-live="polite">Optional performance upgrade. Best downloaded over Wi-Fi.</p>
+          </div>
           <button class="primary-button" id="new-game">New game</button>
           <button class="text-button" id="reset-scores">Reset scores</button>
         </aside>

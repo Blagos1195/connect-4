@@ -62,3 +62,8 @@ button:focus-visible { outline: 2px solid #2463a6; outline-offset: 2px; }
   .board, .column-controls { gap: 3px; }
   .board { padding: 5px; }
 }
+
+.book-option { margin: 12px 0 8px; }
+.book-option .text-button { margin-top: 0; }
+.book-option p { margin: 6px 0 0; color: #777; font-size: 10px; line-height: 1.4; }
+.book-option button:disabled { color: #777; cursor: default; }
