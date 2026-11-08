@@ -41,7 +41,7 @@ jobs:
           python scripts/train_from_perfect_solver.py \
             --solver /tmp/connect4-solver/c4solver \
             --positions 20000 \
-            --epochs 16 \
+            --epochs 64 \
             --seed "$GITHUB_RUN_NUMBER"
 
       - name: Compare candidate with published model
