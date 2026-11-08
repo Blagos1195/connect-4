@@ -137,7 +137,7 @@ def main():
         if not legal_scores:
             skipped += 1
             continue
-            for col, score in legal_scores:
+        for col, score in legal_scores:
             bit = 1 << (col * STRIDE + int(heights[col]))
             next_heights = heights.copy()
             next_heights[col] += 1
