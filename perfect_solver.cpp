@@ -384,7 +384,8 @@ int main() {
             continue;
         }
         int move = solver.best_move(p);
-        std::cout << move << " 0 " << solver.node_count() << "\n";\n        std::cout.flush();
+        std::cout << move << " 0 " << solver.node_count() << "\n";
+        std::cout.flush();
     }
     return 0;
 }
