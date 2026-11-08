@@ -51,7 +51,7 @@ def main():
     boards = ["4", "44", "444", "4444", "434343", "343434", "1234567", "7654321"] + positions(80, 94117)
     payload = "".join(board + "\n" for board in boards)
     actual = subprocess.run([ours], input=payload, text=True, capture_output=True, check=True, timeout=900)
-    expected = subprocess.run([oracle, "-a", "-b", "/dev/null"], input=payload, text=True, capture_output=True, check=True, timeout=900)
+    expected = subprocess.run([oracle, "-a", "-b", "7x6_small.book"], input=payload, text=True, capture_output=True, check=True, timeout=900)
     actual_lines = actual.stdout.splitlines()
     expected_lines = expected.stdout.splitlines()
     if len(actual_lines) != len(boards) or len(expected_lines) != len(boards):
