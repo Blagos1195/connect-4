@@ -3,10 +3,14 @@ name: Verify perfect Connect Four solver
 on:
   push:
     branches:
-      - perfect-solver-engine
+      - main
+      - perfect-solver-web
     paths:
       - "perfect_solver.cpp"
       - "tests/test_perfect_solver_differential.py"
+      - "tests/test_exact_solver_interface.py"
+      - "7x6_small.book"
+      - "exact_solver.py"
       - ".github/workflows/verify-perfect-solver.yml"
   workflow_dispatch:
 
