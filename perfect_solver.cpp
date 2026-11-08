@@ -475,7 +475,11 @@ bool parse_position(const char* sequence, Position& p) {
 
 extern "C" {
 
-C4_EXPORT int c4_load_book(const uint8_t* data, int length) {\n    return length > 0 && solver.load_book_bytes(data, static_cast<size_t>(length)) ? 1 : 0;\n}\n\nC4_EXPORT int c4_best_move(const char* sequence) {
+C4_EXPORT int c4_load_book(const uint8_t* data, int length) {
+    return length > 0 && solver.load_book_bytes(data, static_cast<size_t>(length)) ? 1 : 0;
+}
+
+C4_EXPORT int c4_best_move(const char* sequence) {
     Position p;
     if (!parse_position(sequence, p)) return -1;
     return solver.best_move(p);
@@ -484,7 +488,7 @@ C4_EXPORT int c4_load_book(const uint8_t* data, int length) {\n    return length
 C4_EXPORT int c4_score(const char* sequence) {
     Position p;
     if (!parse_position(sequence, p)) return -100;
-    return solver.best_move(p);
+    return solver.score(p);
 }
 
 C4_EXPORT int c4_analyze(const char* sequence, int* output) {
@@ -503,15 +507,19 @@ C4_EXPORT double c4_nodes() {
 
 #ifndef __EMSCRIPTEN__
 int main() {
+    solver.load_book_file("7x6_small.book");
     std::string line;
     while (std::getline(std::cin, line)) {
         Position p;
         if (!parse_position(line.c_str(), p)) {
             std::cout << "-1 -100 0\n";
+            std::cout.flush();
             continue;
         }
         int move = solver.best_move(p);
-        std::cout << move << " 0 " << solver.node_count() << "\n";
+        int score = solver.score(p);
+        std::cout << move << " " << score << " " << solver.node_count() << "\n";
+        std::cout.flush();
     }
     return 0;
 }
