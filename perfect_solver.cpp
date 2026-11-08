@@ -69,9 +69,10 @@ struct Position {
     uint64_t winning_moves(uint64_t stones) const {
         uint64_t result = 0;
         for (int shift : SHIFTS) {
-            uint64_t three = stones & (stones >> shift) & (stones >> (2 * shift));
-            result |= three << (3 * shift);
+            uint64_t three = (stones >> shift) & (stones >> (2 * shift)) & (stones >> (3 * shift));
             result |= three;
+            three = stones & (stones >> shift) & (stones >> (2 * shift));
+            result |= three << (3 * shift);
             three = stones & (stones >> (2 * shift)) & (stones >> (3 * shift));
             result |= three << shift;
             three = stones & (stones >> shift) & (stones >> (3 * shift));
@@ -99,6 +100,10 @@ struct Position {
             }
         }
         return result;
+    }
+
+    bool is_mirrored() const {
+        return mirror(current) + mirror(mask) < current + mask;
     }
 
     uint64_t key() const {
@@ -166,8 +171,9 @@ class Solver {
         uint64_t key = p.key();
         Entry& entry = table[hash_key(key) & TABLE_MASK];
         int preferred = -1;
+        bool reflected = p.is_mirrored();
         if (entry.flag && entry.key == key) {
-            preferred = entry.best;
+            preferred = reflected ? WIDTH - 1 - entry.best : entry.best;
             if (entry.flag == 1) return entry.score;
             if (entry.flag == 2) alpha = std::max(alpha, static_cast<int>(entry.score));
             if (entry.flag == 3) beta = std::min(beta, static_cast<int>(entry.score));
@@ -200,7 +206,7 @@ class Solver {
         Entry updated;
         updated.key = key;
         updated.score = static_cast<int16_t>(best_score);
-        updated.best = static_cast<uint8_t>(best_col < 0 ? 0 : best_col);
+        updated.best = static_cast<uint8_t>(best_col < 0 ? 0 : reflected ? WIDTH - 1 - best_col : best_col);
         updated.flag = best_score <= original_alpha ? 3 : best_score >= original_beta ? 2 : 1;
         entry = updated;
         return best_score;
