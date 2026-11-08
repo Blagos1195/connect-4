@@ -97,10 +97,15 @@ async function downloadBook() {
 }
 
 function cacheKey(moves) {
-  const mirror = [...moves].map(move => String(8 - Number(move))).join("");
-  const mirrored = moves > mirror;
+  const columns = Array.from({ length: 7 }, () => []);
+  for (let i = 0; i < moves.length; i++) {
+    columns[Number(moves[i]) - 1].push(i % 2 === 0 ? "X" : "O");
+  }
+  const forward = columns.map(column => column.join("")).join("/");
+  const reverse = [...columns].reverse().map(column => column.join("")).join("/");
+  const mirrored = forward > reverse;
   return {
-    key: SOLVER_VERSION + ":" + (mirrored ? mirror : moves),
+    key: SOLVER_VERSION + ":" + (moves.length % 2) + ":" + (mirrored ? reverse : forward),
     mirrored
   };
 }
@@ -114,7 +119,7 @@ async function findMove(moves) {
 
   const move = solver.ccall("c4_best_move", "number", ["string"], [moves]);
   if (move >= 0 && move < 7) {
-    await writeRecord("positions", {
+    void writeRecord("positions", {
       key,
       move: mirrored ? 6 - move : move
     });
