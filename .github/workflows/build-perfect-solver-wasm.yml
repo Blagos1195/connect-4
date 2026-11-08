@@ -3,6 +3,7 @@ name: Build exact Connect Four WebAssembly engine
 on:
   push:
     branches:
+      - main
       - perfect-solver-web
     paths:
       - "perfect_solver.cpp"
@@ -19,7 +20,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: connect-four-perfect-solver-wasm
+  group: connect-four-perfect-solver-wasm-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -29,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: perfect-solver-web
+          ref: ${{ github.ref_name }}
 
       - uses: mymindstorm/setup-emsdk@v14
         with:
@@ -69,5 +70,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add perfect_solver.js perfect_solver.wasm 7x6_small.book
+          if git diff --cached --quiet; then exit 0; fi
           git commit -m "Build exact solver WebAssembly module"
-          git push origin HEAD:perfect-solver-web
+          git push origin "HEAD:${GITHUB_REF_NAME}"
