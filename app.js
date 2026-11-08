@@ -18,6 +18,7 @@ const opponentName = document.querySelector("#opponent-name");
 const secretHintButton = document.querySelector("#secret-hint");
 const bookButton = document.querySelector("#download-book");
 const bookStatus = document.querySelector("#book-status");
+const bookOption = document.querySelector(".book-option");
 bookButton.disabled = true;
 
 let mode = "ai";
@@ -180,6 +181,7 @@ function findWinningLine(position, player) {
 
 function render() {
   boardElement.replaceChildren();
+  bookOption.hidden = mode !== "ai";
   board.forEach((value, index) => {
     const cell = document.createElement("div");
     cell.className = "cell";
